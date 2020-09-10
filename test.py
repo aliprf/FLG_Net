@@ -11,7 +11,6 @@ import os.path
 import scipy.io as sio
 from cnn_model import CNNModel
 import img_printer as imgpr
-from pose_detection.code.PoseDetector import PoseDetector, utils
 from tqdm import tqdm
 from os import listdir
 from os.path import isfile, join

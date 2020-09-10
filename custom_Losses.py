@@ -29,6 +29,9 @@ class Custom_losses:
         self.accuracy = accuracy
 
 
+    def inter_landmark_loss(self, yTrue, yPred):
+        return 0
+
     def asm_assisted_loss(self, yTrue, yPred):
         '''def::
              l_1 = mse(yTrue, yPre)

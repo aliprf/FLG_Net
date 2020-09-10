@@ -98,7 +98,6 @@ class TrainGan:
         reg_model = self.create_reg_net(input_tensor=None, input_shape=[56, 56, 68])
 
         # reg_model.trainable = False
-
         seq_model_input = Input(shape=(224, 224, 3))
         hm_model_out = hm_model(seq_model_input)
 
@@ -136,7 +135,6 @@ class TrainGan:
                 g_loss = seq_model.train_on_batch(imgs, y_gen)
 
                 print(f'Epoch: {epoch} \t Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
-
 
 
 

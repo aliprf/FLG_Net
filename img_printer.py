@@ -95,8 +95,21 @@ def print_image(image_name, landmarks_x, landmarks_y):
         plt.show()
 
 
+def print_partial_heat(k, hm_arr, total):
+    if total:
+        hm_arr = np.sum(hm_arr, axis=0)
+        hm_arr = [hm_arr]
+    counter = 0
+    for hm in hm_arr:
+        plt.figure()
+        plt.imshow(hm, vmin=0, vmax=1)
+        plt.axis('off')
+        plt.savefig('heat_' + str(k) + '_' + str(counter) + '.png', bbox_inches='tight')
+        plt.clf()
+        counter += 1
+
 def print_image_arr_heat(k, image, print_single=False):
-    import numpy as np
+
     for i in range(image.shape[2]):
         img = np.sum(image, axis=2)
         if print_single:

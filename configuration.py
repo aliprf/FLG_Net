@@ -146,6 +146,7 @@ class WflwConf:
     test_images_dir = Wflw_prefix_path + 'test_images_pts_dir/'
     test_normalized_points_npy_dir = Wflw_prefix_path + 'test_normalized_npy_dir/'
     test_pose_npy_dir = Wflw_prefix_path + 'test_pose_npy_dir/'
+    train_hm_dir = Wflw_prefix_path + 'train_hm_dir/'
 
     tf_train_path = Wflw_prefix_path + 'train.tfrecords'
     tf_evaluation_path = Wflw_prefix_path + 'evaluation.tfrecords'
@@ -171,14 +172,14 @@ class WflwConf:
     orig_of_all_test_makeup = 206
     orig_of_all_test_occlusion = 736
 
-    number_of_all_sample = 270956  # just images. dont count both img and lbls
-    number_of_train_sample = 200000  # 95 % for train
-    # number_of_train_sample = int(number_of_all_sample * 0.95)  # 95 % for train
+    number_of_all_sample = 0  # just images. dont count both img and lbls
+    number_of_train_sample = int(number_of_all_sample * 0.95)  # 95 % for train
     number_of_evaluation_sample = int(number_of_all_sample * 0.05) # 5% for evaluation
 
     augmentation_factor = 4  # create . image from 4
     augmentation_factor_rotate = 15  # create . image from 15
     num_of_landmarks = 98
+    num_face_graph_elements = 1
 
 class CofwConf:
     # Cofw_prefix_path = '/media/data3/ali/FL/cofw/'  # --> Zeus
@@ -200,6 +201,7 @@ class CofwConf:
     tf_train_path = Cofw_prefix_path + 'train.tfrecords'
     tf_test_path = Cofw_prefix_path + 'test.tfrecords'
     tf_evaluation_path = Cofw_prefix_path + 'evaluation.tfrecords'
+    train_hm_dir = Cofw_prefix_path + 'train_hm_dir/'
 
     tf_train_path_95 = Cofw_prefix_path + 'train_95.tfrecords'
     tf_evaluation_path_95 = Cofw_prefix_path + 'evaluation_95.tfrecords'
@@ -207,13 +209,14 @@ class CofwConf:
     orig_number_of_training = 1345
     orig_number_of_test = 507
 
-    number_of_all_sample = 108820  # afw, train_helen, train_lfpw
+    number_of_all_sample = 0  # afw, train_helen, train_lfpw
     number_of_train_sample = int(number_of_all_sample * 0.95)  # 95 % for train
     number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
     augmentation_factor = 5  # create . image from 1
     augmentation_factor_rotate = 30  # create . image from 1
     num_of_landmarks = 28
+    num_face_graph_elements = 1
 
 
 class IbugConf:
@@ -244,10 +247,7 @@ class IbugConf:
     test_normalized_points_npy_dir = _Ibug_prefix_path + 'test_normalized_npy_dir/'
     test_pose_npy_dir = _Ibug_prefix_path + 'test_pose_npy_dir/'
 
-    # train_hm_dir = '/media/data2/alip/fala/ibug/train_hm_dir/'
-    # train_hm_dir_85 = '/media/data2/alip/fala/ibug/train_hm_dir_85/'
-    # train_hm_dir_90 = '/media/data2/alip/fala/ibug/train_hm_dir_90/'
-    # train_hm_dir_97 = '/media/data2/alip/fala/ibug/train_hm_dir_97/'
+    train_hm_dir = _Ibug_prefix_path + 'train_hm_dir/'
 
     orig_number_of_training = 3148
     orig_number_of_test_full = 689
@@ -255,11 +255,12 @@ class IbugConf:
     orig_number_of_test_challenging = 135
 
     '''after augmentation'''
-    number_of_all_sample = 134688   # afw, train_helen, train_lfpw
+    number_of_all_sample = 0   # afw, train_helen, train_lfpw
     number_of_train_sample = int(number_of_all_sample * 0.95)  # 95 % for train
     number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
     augmentation_factor = 4  # create . image from 1
     augmentation_factor_rotate = 20  # create . image from 1
     num_of_landmarks = 68
+    num_face_graph_elements = 1
 

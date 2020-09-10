@@ -6,12 +6,16 @@ from image_utility import ImageUtility
 import numpy as np
 from train import Train
 from test import Test
-
-# from Train_Gan import TrainGan
-
+from Train_Gan import TrainGan
+from Facial_GAN import FacialGAN
 import img_printer as imgp
 
 if __name__ == '__main__':
+
+    fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
+                   discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
+                   input_shape=[224, 224, 3])
+    fg.train_network()
 
     # x = np.random.normal(size=100)
     # imgp.print_histogram(x)
@@ -23,8 +27,8 @@ if __name__ == '__main__':
     cnn_model = CNNModel()
     image_utility = ImageUtility()
 
-    # tf_record_util = TFRecordUtility(WflwConf.num_of_landmarks*2)
-    # tf_record_util._create_face_graph(dataset_name=DatasetName.wflw, dataset_type=None)
+    tf_record_util = TFRecordUtility(CofwConf.num_of_landmarks*2)
+    # tf_record_util._create_face_graph(dataset_name=DatasetName.cofw, dataset_type=None)
 
     # tf_record_util.test_hm_accuracy()
     # tf_record_util.create_adv_att_img_hm()
@@ -38,14 +42,12 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
-    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
+    tf_record_util = TFRecordUtility(CofwConf.num_of_landmarks*2)
+    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.cofw)
     # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
     '''     normalize the points and save'''
-    # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
+    # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.cofw)
     # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
-    '''     generate pose using hopeNet'''
-    # tf_record_util.detect_pose_and_save(dataset_name=DatasetName.cofw)
 
     '''     create and save PCA objects'''
     # pca_utility.create_pca_from_points(DatasetName.wflw, 80)
@@ -86,9 +88,10 @@ if __name__ == '__main__':
     # tf_record_util = TFRecordUtility(WflwConf.num_of_landmarks * 2)
     # tf_record_util.create_point_imgpath_map_tf_record(dataset_name=DatasetName.wflw)
 
-    '''--> Train GAN:'''
+    '''--> Train FacialGAN:'''
     # trg = TrainGan()
     # trg.create_seq_model()
+
 
     '''--> Evaluate Results'''
     '''testing one-by-one'''

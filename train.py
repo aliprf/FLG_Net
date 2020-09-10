@@ -8,8 +8,8 @@ from Data_custom_generator import CustomHeatmapGenerator
 import tensorflow as tf
 import keras
 
-print(tf.__version__)
-print(keras.__version__)
+# print(tf.__version__)
+# print(keras.__version__)
 
 tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.callbacks import ModelCheckpoint

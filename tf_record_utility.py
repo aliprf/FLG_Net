@@ -16,14 +16,11 @@ from keras import backend as K
 
 from scipy import misc
 from scipy.ndimage import gaussian_filter, maximum_filter
-import copy_multitask
 from numpy import save, load, asarray
 import img_printer as imgpr
 from tqdm import tqdm
 from pca_utility import PCAUtility
 import pickle
-
-from pose_detection.code.PoseDetector import PoseDetector
 import PIL.ImageDraw as ImageDraw
 import PIL.Image as Image
 
@@ -578,7 +575,7 @@ class TFRecordUtility:
 
     # def retrive_hm_and_test(self):
 
-    def create_image_and_labels_name(self):
+    def create_image_and_labels_name(self, dataset_name):
         images_dir = IbugConf.train_images_dir
         lbls_dir = IbugConf.train_hm_dir
 
@@ -619,7 +616,6 @@ class TFRecordUtility:
         return arr_err
 
     def detect_pose_and_save(self, dataset_name):
-        pose_detector = PoseDetector()
 
         if dataset_name == DatasetName.ibug:
             images_dir = IbugConf.train_images_dir
@@ -774,7 +770,7 @@ class TFRecordUtility:
                                                      InputDataSize.image_input_size/2,
                                                      InputDataSize.image_input_size/2
                                                      )
-                imgpr.print_image_arr(counter+1, img, landmark_arr_x_n, landmark_arr_y_n)
+                # imgpr.print_image_arr(counter+1, img, landmark_arr_x_n, landmark_arr_y_n)
                 ''''''
                 save(np_path, normalized_points)
                 counter += 1
@@ -841,15 +837,15 @@ class TFRecordUtility:
                 counter += 1
         print('generate_hm_and_save COMPLETED!!!')
 
-    def generate_hm(self, height, width, landmarks, s=3.0, upsample=True):
-        """ Generate a full Heap Map for every landmarks in an array
-        Args:
-            height    : The height of Heat Map (the height of target output)
-            width     : The width  of Heat Map (the width of target output)
-            joints    : [(x1,y1),(x2,y2)...] containing landmarks
-            maxlenght : Lenght of the Bounding Box
-        """
+    def generate_partial_hm(self, height, width, landmarks_arr, s=3.0, upsample=True):
+        hm_ar =[]
+        for landmark in landmarks_arr:
+            point_wise_hm = self.generate_hm(height, width, landmark, s, upsample)
+            partial_hm = np.sum(point_wise_hm, axis=2)
+            hm_ar.append(partial_hm)
+        return hm_ar
 
+    def generate_hm(self, height, width, landmarks, s=3.0, upsample=True):
         Nlandmarks = len(landmarks)
         hm = np.zeros((height, width, Nlandmarks // 2), dtype=np.float32)
 
@@ -1911,7 +1907,13 @@ class TFRecordUtility:
         landmark_arr.append(u_mouth)
         landmark_arr.append(l_mouth)
 
-        imgpr.print_partial(counter, img, landmark_arr)
+        # imgpr.print_partial(counter, img, landmark_arr)
+
+        hm_arr = self.generate_partial_hm(InputDataSize.image_input_size//4, InputDataSize.image_input_size//4,
+                                          landmark_arr, s=1.2)
+        # for i in range(len(hm_arr)):
+        #     imgpr.print_image_arr_heat('zHM_' + str(counter)+'_'+str(i), hm_arr[i])
+        imgpr.print_partial_heat('z_HM' + str(counter)+'_', np.array(hm_arr), True)
 
     def _create_cofw_graph(self, counter, img, landmark):
 
@@ -1933,7 +1935,13 @@ class TFRecordUtility:
         landmark_arr.append(nose)
         landmark_arr.append(mouth)
 
-        imgpr.print_partial(counter, img, landmark_arr)
+        # imgpr.print_partial(counter, img, landmark_arr)
+        hm_arr = self.generate_partial_hm(InputDataSize.image_input_size // 4, InputDataSize.image_input_size // 4,
+                                          landmark_arr, s=2.5)
+        # for i in range(len(hm_arr)):
+        #     imgpr.print_image_arr_heat('zHM_' + str(counter)+'_'+str(i), hm_arr[i])
+        imgpr.print_partial_heat('z_HM' + str(counter) + '_', np.array(hm_arr), True)
+        imgpr.print_image_arr('z_img' + str(counter) + '_', img, [],[])
 
     def _create_ibug_graph(self, counter, img, landmark):
 
@@ -1963,8 +1971,14 @@ class TFRecordUtility:
         landmark_arr.append(r_eye)
         landmark_arr.append(u_lip)
         landmark_arr.append(l_lip)
-        imgpr.print_partial(counter, img, landmark_arr)
 
+        # imgpr.print_partial(counter, img, landmark_arr)
+        hm_arr = self.generate_partial_hm(InputDataSize.image_input_size // 4, InputDataSize.image_input_size // 4,
+                                          landmark_arr, s=1.8)
+        # for i in range(len(hm_arr)):
+        #     imgpr.print_image_arr_heat('zHM_' + str(counter)+'_'+str(i), hm_arr[i])
+        imgpr.print_partial_heat('z_HM' + str(counter) + '_', np.array(hm_arr), True)
+        # imgpr.print_image_arr('z_img' + str(counter) + '_', img, [], [])
 
     def _create_tfrecord_from_npy(self, dataset_name, dataset_type, isTest, accuracy=100):
         """we use this function when we have already created and nrmalzed both landmarks and poses"""

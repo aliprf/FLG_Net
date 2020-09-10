@@ -10,6 +10,8 @@ __pycache__/
 results_1/*
 results*
 data/*
+train_logs/*
+file_names/*
 venv/*
 logs/*
 
