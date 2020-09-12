@@ -39,10 +39,11 @@ import efficientnet.keras as efn
 
 
 class CNNModel:
-    def get_model(self, input_tensor, arch, num_landmark, input_shape):
+    def get_model(self, input_tensor, arch, num_landmark, num_face_graph_elements, input_shape):
 
         if arch == 'effGlassNet':
-            model = self.create_effGlassNet(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
+            model = self.create_effGlassNet(input_shape=input_shape, input_tensor=input_tensor,
+                                            num_landmark=num_landmark, num_face_graph_elements=num_face_graph_elements)
         elif arch == 'effDiscrimNet':
             model = self.create_effDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
 
@@ -63,14 +64,14 @@ class CNNModel:
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
                                      pooling=None,
-                                     classes=2)
+                                     classes=1)
         eff_net.summary()
         model_json = eff_net.to_json()
         with open("effDiscrimNet.json", "w") as json_file:
             json_file.write(model_json)
         return eff_net
 
-    def create_effGlassNet(self, input_shape, input_tensor, num_landmark):
+    def create_effGlassNet(self, input_shape, input_tensor, num_landmark, num_face_graph_elements):
         """
         This is EfficientNet-B7 combined with one stack of StackedHourGlassNetwork used as heatmap & geo regressor network.
         :param input_shape:
@@ -139,7 +140,7 @@ class CNNModel:
         x = keras.layers.add([x, bn_0])  # 56, 56, 256
 
         '''out heatmap regression'''
-        out_heatmap = Conv2D(num_landmark // 2, kernel_size=1, padding='same', name='O_hm')(x)
+        out_heatmap = Conv2D(num_face_graph_elements, kernel_size=1, padding='same', name='O_hm')(x)
 
         '''out for geo regression'''
         x = GlobalAveragePooling2D()(top_activation)

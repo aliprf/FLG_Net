@@ -68,7 +68,7 @@ class LearningConfig:
     MIN_LR = 1e-7
     MAX_LR = 1e-2
     STEP_SIZE = 10
-    batch_size = 70
+    batch_size = 2
     steps_per_validation_epochs = 5
 
     epochs = 200
@@ -179,7 +179,7 @@ class WflwConf:
     augmentation_factor = 4  # create . image from 4
     augmentation_factor_rotate = 15  # create . image from 15
     num_of_landmarks = 98
-    num_face_graph_elements = 1
+    num_face_graph_elements = 8
 
 class CofwConf:
     # Cofw_prefix_path = '/media/data3/ali/FL/cofw/'  # --> Zeus
@@ -216,7 +216,7 @@ class CofwConf:
     augmentation_factor = 5  # create . image from 1
     augmentation_factor_rotate = 30  # create . image from 1
     num_of_landmarks = 28
-    num_face_graph_elements = 1
+    num_face_graph_elements = 8
 
 
 class IbugConf:
@@ -262,5 +262,5 @@ class IbugConf:
     augmentation_factor = 4  # create . image from 1
     augmentation_factor_rotate = 20  # create . image from 1
     num_of_landmarks = 68
-    num_face_graph_elements = 1
+    num_face_graph_elements = 8
 

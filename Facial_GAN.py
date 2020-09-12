@@ -4,8 +4,9 @@ from cnn_model import CNNModel
 from custom_Losses import Custom_losses
 import tensorflow as tf
 import keras
+import keras.backend as K
 from keras.optimizers import adam
-from keras.layers import Input
+from keras.layers import Input, Lambda
 
 import numpy as np
 from datetime import datetime
@@ -17,22 +18,26 @@ import os.path
 from keras import losses
 import csv
 from skimage.io import imread
+from keras.models import Model
+
 tf.logging.set_verbosity(tf.logging.ERROR)
 
 
 class FacialGAN:
     def __init__(self, dataset_name, geo_custom_loss, regressor_arch,
-                 discriminator_arch, regressor_weight, discriminator_weight, input_shape):
+                 discriminator_arch, regressor_weight, discriminator_weight, input_shape_reg, input_shape_disc):
         self.dataset_name = dataset_name
         self.geo_custom_loss = geo_custom_loss
         self.regressor_arch = regressor_arch
         self.discriminator_arch = discriminator_arch
         self.regressor_weight = regressor_weight
-        self.regressor_weight = regressor_weight
-        self.input_shape = input_shape
+        self.discriminator_weight = discriminator_weight
+        self.input_shape_reg = input_shape_reg
+        self.input_shape_disc = input_shape_disc
         if dataset_name == DatasetName.ibug:
             self.SUM_OF_ALL_TRAIN_SAMPLES = IbugConf.number_of_all_sample
             self.num_landmark = IbugConf.num_of_landmarks * 2
+            self.num_face_graph_elements = IbugConf.num_face_graph_elements
             self.train_images_dir = IbugConf.train_images_dir
             self.train_hm_dir = IbugConf.train_hm_dir
             self.train_point_dir = IbugConf.normalized_points_npy_dir
@@ -40,6 +45,7 @@ class FacialGAN:
         elif dataset_name == DatasetName.cofw:
             self.SUM_OF_ALL_TRAIN_SAMPLES = CofwConf.number_of_all_sample
             self.num_landmark = CofwConf.num_of_landmarks * 2
+            self.num_face_graph_elements = CofwConf.num_face_graph_elements
             self.train_images_dir = CofwConf.train_images_dir
             self.train_hm_dir = CofwConf.train_hm_dir
             self.train_point_dir = CofwConf.normalized_points_npy_dir
@@ -47,6 +53,7 @@ class FacialGAN:
         elif dataset_name == DatasetName.wflw:
             self.SUM_OF_ALL_TRAIN_SAMPLES = WflwConf.number_of_all_sample
             self.num_landmark = WflwConf.num_of_landmarks * 2
+            self.num_face_graph_elements = WflwConf.num_face_graph_elements
             self.train_images_dir = WflwConf.train_images_dir
             self.train_hm_dir = WflwConf.train_hm_dir
             self.train_point_dir = WflwConf.normalized_points_npy_dir
@@ -64,14 +71,32 @@ class FacialGAN:
         """
 
         '''Creating models:'''
-        reg_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape)
-        disc_model = self._create_discriminator_net(input_tensor=None, input_shape=self.input_shape)
+        reg_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape_reg)
+        disc_model = self._create_discriminator_net(input_tensor=None, input_shape=self.input_shape_disc)
+
+        '''Setting up GAN here:'''
+        # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
+        # reg_model.trainable = False
+        # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
+        gan_model_input = Input(shape=self.input_shape_reg)
+        # reg_model_out = reg_model(gan_model_input)[0]
+        reg_model_out = self._fuse_hm_and_points(reg_model(gan_model_input))
+
+        gan_model_output = disc_model(reg_model_out)
+
+        gan_model = Model(gan_model_input, outputs=gan_model_output)
+
+        gan_model.compile(loss=keras.losses.binary_crossentropy,
+                          optimizer=self._get_optimizer())
+
+        gan_model.summary()
+        '''save GAN Model'''
+        model_json = gan_model.to_json()
+        with open("gan_model.json", "w") as json_file:
+            json_file.write(model_json)
 
         '''create train, validation, test data iterator'''
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
-
-        '''Setting up GAN here:'''
-        # reg_model.trainable = False
 
         '''Save both model metrics in  a CSV file'''
         log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
@@ -105,7 +130,7 @@ class FacialGAN:
 
             loss.append(epoch)
             self._write_loss_log(log_file_name, loss)
-            model.save_weights('weight_ep_'+str(epoch)+'_los_'+str(loss)+'.h5')
+            gan_model.save_weights('weight_ep_'+str(epoch)+'_los_'+str(loss)+'.h5')
 
 
     def _create_regressor_net(self, input_tensor, input_shape):
@@ -121,7 +146,7 @@ class FacialGAN:
         """
         cnn = CNNModel()
         model = cnn.get_model(input_tensor=input_tensor, arch=self.regressor_arch, num_landmark=self.num_landmark,
-                              input_shape=input_shape)
+                              input_shape=input_shape, num_face_graph_elements=self.num_face_graph_elements)
         if self.regressor_weight is not None:
             model.load_weights(self.regressor_weight)
         model.compile(loss=self.geo_loss, optimizer=self._get_optimizer(), metrics=['mse'])
@@ -139,13 +164,64 @@ class FacialGAN:
 
         cnn = CNNModel()
         model = cnn.get_model(input_tensor=input_tensor, arch=self.discriminator_arch, input_shape=input_shape,
-                              num_landmark=self.num_landmark)
+                              num_landmark=self.num_landmark, num_face_graph_elements=self.num_face_graph_elements)
         if self.discriminator_weight is not None:
             model.load_weights(self.discriminator_weight)
         model.compile(loss=keras.losses.binary_crossentropy,
                       optimizer=self._get_optimizer(),
                       metrics=['accuracy'])
         return model
+
+    def _fuse_hm_and_points(self, hm_point_tensor):
+        """
+
+        :param hm_point_tensor:[ [?, ?, ?, 8], [?, 136] ]
+        :return: [56,56,1] hm_+_points(fused in one layer) or [56,56,2] ==> hm, points
+        """
+        t_hm = hm_point_tensor[0]
+        t_hm_cp = hm_point_tensor[0]
+        t_pn = hm_point_tensor[1]
+
+        t_pn_img = Lambda(lambda x: self._convert_to_geometric(t_hm_cp, tf.cast(x, 'int64')))(t_pn)
+        t_fused = keras.layers.concatenate([t_hm, t_pn_img])
+
+        # t_pn_1 = Lambda(lambda t_p:  self._convert_to_geometric(t_p))(t_pn)
+        # t_pn = K.variable(np.zeros([56, 56, 1]))
+        # t_pn = K.expand_dims(t_pn, axis=0)
+        # t_fused = keras.layers.concatenate([t_hm, t_pn_1])
+
+        # t_hm_np = K.variable(K.eval(t_hm))
+        # t_fused = K.concatenate([t_hm_np, self._convert_to_geometric(t_pn)])
+        # t_fused = keras.layers.concatenate([t_hm_np, self._convert_to_geometric(t_pn)])
+        # t_fused = Lambda(lambda x: x)(t_fused)
+
+        # t_fused = tf.math.reduce_sum([t_hm, t_hm], axis=3)
+        return t_fused
+
+    def _convert_to_geometric(self, hm_img, coordinates):
+        """
+        :param img: ? * 56 * 56 * 8
+        :param coordinates: ? * 136
+        :return:
+        """
+
+        '''create a clean copy of generated image '''
+        img_indices = tf.constant([[x] for x in range(LearningConfig.batch_size)])
+        img_updates = tf.zeros([LearningConfig.batch_size, 56, 56, self.num_face_graph_elements], dtype=tf.float32)
+        tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
+        '''convert two_d_coords to facial part:'''
+        facial_coords = self._slice_face_graph(coordinates)
+
+        return hm_img
+
+    def _slice_face_graph(self, coordinates):
+        # two_d_coords = tf.reshape(tensor=coordinates, shape=[-1, self.num_landmark//2, 2])
+        #  two_d_coords: ? * 136
+
+        # res = tf.slice(two_d_coords, begin=[[:],[0:]]3]], size=[34])
+        res= [coordinates[:, 34]]
+        res= [coordinates[:, 34]]
+        return res
 
     def _get_optimizer(self, lr=1e-2, beta_1=0.9, beta_2=0.999, decay=1e-5):
         return adam(lr=lr, beta_1=beta_1, beta_2=beta_2, decay=decay)
@@ -162,7 +238,6 @@ class FacialGAN:
         hm_batch = np.array([load(hm_tr_path + file_name) for file_name in batch_y])
         pn_batch = np.array([load(pn_tr_path + file_name) for file_name in batch_y])
         return img_batch, hm_batch, pn_batch
-
 
     def _create_generators(self):
         """

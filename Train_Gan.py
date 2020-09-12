@@ -94,18 +94,18 @@ class TrainGan:
         steps_per_epoch = 100
         batch_size = 10
 
-        hm_model = self.create_hm_generator_net()
-        reg_model = self.create_reg_net(input_tensor=None, input_shape=[56, 56, 68])
+        reg_model = self.create_hm_generator_net()
+        dics_model = self.create_reg_net(input_tensor=None, input_shape=[56, 56, 68])
 
-        # reg_model.trainable = False
+        # dics_model.trainable = False
         seq_model_input = Input(shape=(224, 224, 3))
-        hm_model_out = hm_model(seq_model_input)
+        reg_model_out = reg_model(seq_model_input)
 
         # hm_model_out_reshape = hm_model_out
         # hm_model_out_reshape = self.hm_to_point(hm_model_out, batch_size)
         # imp_1 = hm_model_out[0]
 
-        seq_model_output = reg_model(hm_model_out)
+        seq_model_output = dics_model(reg_model_out)
 
         seq_model = Model(seq_model_input, outputs=seq_model_output)
 
@@ -122,14 +122,14 @@ class TrainGan:
 
                 imgs, hms, lbls = self.get_batch_sample(batch_size)
 
-                hm_ps = hm_model.predict_on_batch(imgs)
+                hm_ps = reg_model.predict_on_batch(imgs)
 
                 x = np.concatenate((hms, hm_ps))
 
                 disc_y = np.zeros(2 * batch_size)
                 disc_y[:batch_size] = 0.9
 
-                d_loss = reg_model.train_on_batch(x, disc_y)
+                d_loss = dics_model.train_on_batch(x, disc_y)
 
                 y_gen = np.ones(batch_size)
                 g_loss = seq_model.train_on_batch(imgs, y_gen)
