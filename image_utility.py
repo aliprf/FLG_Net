@@ -383,8 +383,8 @@ class ImageUtility:
         landmark_arr_y = []
 
         for j in range(0, len(landmarks), 2):
-            x = x_center - float(landmarks[j]) * width
-            y = y_center - float(landmarks[j + 1]) * height
+            x = x_center + float(landmarks[j]) * width
+            y = y_center + float(landmarks[j + 1]) * height
 
             landmark_arr_xy.append(x)
             landmark_arr_xy.append(y)  # [ x1, y1, x2,y2 ]

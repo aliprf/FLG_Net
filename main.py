@@ -1,19 +1,20 @@
 from tf_record_utility import TFRecordUtility
-from configuration import DatasetName, DatasetType, AffectnetConf, IbugConf, W300Conf, InputDataSize, CofwConf, WflwConf
+from configuration import DatasetName, DatasetType, AffectnetConf, IbugConf,\
+    W300Conf, InputDataSize, CofwConf, WflwConf
 from cnn_model import CNNModel
 from pca_utility import PCAUtility
 from image_utility import ImageUtility
 import numpy as np
 from train import Train
 from test import Test
-from Train_Gan import TrainGan
 from Facial_GAN import FacialGAN
 
 if __name__ == '__main__':
 
     fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
                    discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
-                   input_shape_reg=[224, 224, 3], input_shape_disc=[56, 56, IbugConf.num_face_graph_elements])
+                   input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+                   input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size, IbugConf.num_face_graph_elements])
     fg.train_network()
 
     # x = np.random.normal(size=100)

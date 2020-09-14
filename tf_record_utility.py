@@ -783,8 +783,8 @@ class TFRecordUtility:
         y_center = height / 2
         landmark_arr_flat_normalized = []
         for p in range(0, len(points_arr), 2):
-            landmark_arr_flat_normalized.append((x_center - points_arr[p]) / width)
-            landmark_arr_flat_normalized.append((y_center - points_arr[p + 1]) / height)
+            landmark_arr_flat_normalized.append((points_arr[p] - x_center) / width)
+            landmark_arr_flat_normalized.append((points_arr[p + 1] - y_center) / height)
         return landmark_arr_flat_normalized
 
     def generate_hm_and_save(self, dataset_name, pca_percentage=100):

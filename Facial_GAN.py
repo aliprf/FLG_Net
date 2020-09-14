@@ -1,4 +1,4 @@
-from configuration import DatasetName, IbugConf, LearningConfig, CofwConf, WflwConf
+from configuration import DatasetName, IbugConf, LearningConfig, CofwConf, WflwConf, InputDataSize
 from tf_record_utility import TFRecordUtility
 from cnn_model import CNNModel
 from custom_Losses import Custom_losses
@@ -130,8 +130,7 @@ class FacialGAN:
 
             loss.append(epoch)
             self._write_loss_log(log_file_name, loss)
-            gan_model.save_weights('weight_ep_'+str(epoch)+'_los_'+str(loss)+'.h5')
-
+            gan_model.save_weights('weight_ep_' + str(epoch) + '_los_' + str(loss) + '.h5')
 
     def _create_regressor_net(self, input_tensor, input_shape):
         """
@@ -200,28 +199,39 @@ class FacialGAN:
 
     def _convert_to_geometric(self, hm_img, coordinates):
         """
-        :param img: ? * 56 * 56 * 8
+        :param img: ? * 56 * 56 * num_face_graph_elements
         :param coordinates: ? * 136
         :return:
         """
 
         '''create a clean copy of generated image '''
         img_indices = tf.constant([[x] for x in range(LearningConfig.batch_size)])
-        img_updates = tf.zeros([LearningConfig.batch_size, 56, 56, self.num_face_graph_elements], dtype=tf.float32)
+        img_updates = tf.zeros([LearningConfig.batch_size, InputDataSize.hm_size,
+                                InputDataSize.hm_size, self.num_face_graph_elements], dtype=tf.float32)
         tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
+
         '''convert two_d_coords to facial part:'''
-        facial_coords = self._slice_face_graph(coordinates)
+        sep_1_d_cord = self._slice_and_normalize_face_graph(coordinates)
+
+        '''convert all points to 2d:'''
+        for cord_item in sep_1_d_cord:
+            two_d_coords = tf.reshape(tensor=cord_item, shape=[-1, cord_item.shape[1] // 2, 2])  # ?(batch_size)*k*2
+            '''Then, for each 2d layer,scatter it to a 56*56 image (our hm_img)'''
 
         return hm_img
 
-    def _slice_face_graph(self, coordinates):
+    def _slice_and_normalize_face_graph(self, coordinates):
         # two_d_coords = tf.reshape(tensor=coordinates, shape=[-1, self.num_landmark//2, 2])
         #  two_d_coords: ? * 136
-
-        # res = tf.slice(two_d_coords, begin=[[:],[0:]]3]], size=[34])
-        res= [coordinates[:, 34]]
-        res= [coordinates[:, 34]]
-        return res
+        if self.dataset_name == DatasetName.wflw:
+            return 0
+        elif self.dataset_name == DatasetName.cofw:
+           return 0
+        elif self.dataset_name == DatasetName.ibug:
+            sep_1_d_cord = [coordinates[:, 0:34], coordinates[:, 34:44], coordinates[:, 44:54], coordinates[:, 54:62],
+                            coordinates[:, 60:72], coordinates[:, 54:72], coordinates[:, 72:84], coordinates[:, 84:96],
+                            coordinates[:, 96:136]]
+        return sep_1_d_cord
 
     def _get_optimizer(self, lr=1e-2, beta_1=0.9, beta_2=0.999, decay=1e-5):
         return adam(lr=lr, beta_1=beta_1, beta_2=beta_2, decay=decay)
@@ -231,8 +241,10 @@ class FacialGAN:
         hm_tr_path = self.train_hm_dir
         pn_tr_path = self.train_point_dir
 
-        batch_x = x_train_filenames[batch_index * LearningConfig.batch_size:(batch_index + 1) * LearningConfig.batch_size]
-        batch_y = y_train_filenames[batch_index * LearningConfig.batch_size:(batch_index + 1) * LearningConfig.batch_size]
+        batch_x = x_train_filenames[
+                  batch_index * LearningConfig.batch_size:(batch_index + 1) * LearningConfig.batch_size]
+        batch_y = y_train_filenames[
+                  batch_index * LearningConfig.batch_size:(batch_index + 1) * LearningConfig.batch_size]
 
         img_batch = np.array([imread(img_path + file_name) for file_name in batch_x])
         hm_batch = np.array([load(hm_tr_path + file_name) for file_name in batch_y])

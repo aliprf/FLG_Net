@@ -28,66 +28,23 @@ class DatasetType:
 
 
 class LearningConfig:
-    weight_loss_heatmap_face = 4.0
-    weight_loss_heatmap_all_face = 4.0
-    weight_loss_regression_face = 2.0
-    weight_loss_regression_pose = 1.0
-
-    weight_loss_heatmap_face_inc1 = 0.5
-    weight_loss_heatmap_all_face_inc1 = 0.5
-    weight_loss_regression_face_inc1 = 0.25
-    weight_loss_regression_pose_inc1 = 0.125
-
-    weight_loss_heatmap_face_inc2 = 1.0
-    weight_loss_heatmap_all_face_inc2 = 1.0
-    weight_loss_regression_face_inc2 = 0.5
-    weight_loss_regression_pose_inc2 = 0.25
-
-    weight_loss_heatmap_face_inc3 = 1.5
-    weight_loss_heatmap_all_face_inc3 = 1.5
-    weight_loss_regression_face_inc3 = 0.75
-    weight_loss_regression_pose_inc3 = 0.375
-
-    loss_weight_inception_1_face = 2
-    # loss_weight_inception_1_pose = 1
-
-    loss_weight_inception_2_face = 5
-    # loss_weight_inception_2_pose = 2
-
-    loss_weight_inception_3_face = 8
-    # loss_weight_inception_3_pose = 3
-
-    loss_weight_pose = 0.5
-
-    loss_weight_face = 1
-    loss_weight_nose = 1
-    loss_weight_eyes = 1
-    loss_weight_mouth = 1
-
     CLR_METHOD = "triangular"
     MIN_LR = 1e-7
     MAX_LR = 1e-2
     STEP_SIZE = 10
     batch_size = 2
     steps_per_validation_epochs = 5
-
     epochs = 200
-    # landmark_len = 136
-    # point_len = 68
-    pose_len = 3
-
-    reg_term_ASM = 0.8
-
 
 
 class InputDataSize:
     image_input_size = 224
-    # landmark_len = 136
-    landmark_face_len = 54
-    landmark_nose_len = 18
-    landmark_eys_len = 24
-    landmark_mouth_len = 40
-    pose_len = 3
+    hm_size = image_input_size//4
+    # landmark_face_len = 54
+    # landmark_nose_len = 18
+    # landmark_eys_len = 24
+    # landmark_mouth_len = 40
+    # pose_len = 3
 
 
 class AffectnetConf:
@@ -262,5 +219,5 @@ class IbugConf:
     augmentation_factor = 4  # create . image from 1
     augmentation_factor_rotate = 20  # create . image from 1
     num_of_landmarks = 68
-    num_face_graph_elements = 8
+    num_face_graph_elements = 9
 
