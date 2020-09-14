@@ -211,16 +211,19 @@ class FacialGAN:
         tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
 
         '''convert two_d_coords to facial part:'''
-        sep_1_d_cord = self._slice_and_normalize_face_graph(coordinates)
+        sep_1_d_cord = self._slice_face_graph(coordinates)
 
         '''convert all points to 2d:'''
-        for cord_item in sep_1_d_cord:
+        for cord_item_normal in sep_1_d_cord:
+            '''convert to hm_scale: from  { from (-0.5, -0.5): (0.5, 0.5) => (0, 0): (56, 56)}'''
+            cord_item = tf.map_fn(fn=lambda landmark: InputDataSize.hm_center + landmark * InputDataSize.hm_size,
+                                  elems=cord_item_normal)
             two_d_coords = tf.reshape(tensor=cord_item, shape=[-1, cord_item.shape[1] // 2, 2])  # ?(batch_size)*k*2
             '''Then, for each 2d layer,scatter it to a 56*56 image (our hm_img)'''
 
         return hm_img
 
-    def _slice_and_normalize_face_graph(self, coordinates):
+    def _slice_face_graph(self, coordinates):
         # two_d_coords = tf.reshape(tensor=coordinates, shape=[-1, self.num_landmark//2, 2])
         #  two_d_coords: ? * 136
         if self.dataset_name == DatasetName.wflw:

@@ -39,7 +39,11 @@ class LearningConfig:
 
 class InputDataSize:
     image_input_size = 224
-    hm_size = image_input_size//4
+    img_center = image_input_size //2  # 112
+
+    hm_size = image_input_size//4  # 56
+    hm_center = hm_size//2 #  28
+
     # landmark_face_len = 54
     # landmark_nose_len = 18
     # landmark_eys_len = 24

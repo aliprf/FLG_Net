@@ -9,6 +9,10 @@ from train import Train
 from test import Test
 from Facial_GAN import FacialGAN
 
+# import tensorflow as tf
+# import keras
+# import keras.backend as K
+
 if __name__ == '__main__':
 
     fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
