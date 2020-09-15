@@ -853,8 +853,8 @@ class TFRecordUtility:
         for i in range(0, Nlandmarks, 2):
 
             if upsample:
-                x = (112 - float(landmarks[i]) * 224)
-                y = (112 - float(landmarks[i + 1]) * 224)
+                x = float(landmarks[i]) * InputDataSize.image_input_size + InputDataSize.img_center
+                y = float(landmarks[i + 1]) * InputDataSize.image_input_size + InputDataSize.img_center
             else:
                 x = landmarks[i]
                 y = landmarks[i + 1]

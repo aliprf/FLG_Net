@@ -1,6 +1,6 @@
 from tf_record_utility import TFRecordUtility
 from configuration import DatasetName, DatasetType, AffectnetConf, IbugConf,\
-    W300Conf, InputDataSize, CofwConf, WflwConf
+    W300Conf, InputDataSize, CofwConf, WflwConf, LearningConfig
 from cnn_model import CNNModel
 from pca_utility import PCAUtility
 from image_utility import ImageUtility
@@ -9,12 +9,21 @@ from train import Train
 from test import Test
 from Facial_GAN import FacialGAN
 
-# import tensorflow as tf
-# import keras
-# import keras.backend as K
+import tensorflow as tf
+import keras
+import keras.backend as K
 
 if __name__ == '__main__':
-
+    # indices = tf.random.uniform(shape=[4, 3, 2], maxval=2, dtype=tf.int32)
+    # indices = tf.constant([[0, 0,0, 0], [1, 1,1, 0]], dtype=tf.int32)
+    # print(K.eval(indices))
+    #
+    # img_updates = tf.ones([2], dtype=tf.float32)
+    # hm_img = tf.zeros([2, 5, 5, 1], dtype=tf.float32)
+    # hm_img_1 = tf.tensor_scatter_nd_update(hm_img, indices, img_updates)
+    # print(K.eval(hm_img_1))
+    #
+    # print('1')
     fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
                    discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
                    input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],

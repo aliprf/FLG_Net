@@ -1,3 +1,5 @@
+from past.types import basestring
+
 from configuration import DatasetName, IbugConf, LearningConfig, CofwConf, WflwConf, InputDataSize
 from tf_record_utility import TFRecordUtility
 from cnn_model import CNNModel
@@ -21,6 +23,7 @@ from skimage.io import imread
 from keras.models import Model
 
 tf.logging.set_verbosity(tf.logging.ERROR)
+import itertools
 
 
 class FacialGAN:
@@ -76,10 +79,10 @@ class FacialGAN:
 
         '''Setting up GAN here:'''
         # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
-        # reg_model.trainable = False
         # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
+
+        reg_model.trainable = False
         gan_model_input = Input(shape=self.input_shape_reg)
-        # reg_model_out = reg_model(gan_model_input)[0]
         reg_model_out = self._fuse_hm_and_points(reg_model(gan_model_input))
 
         gan_model_output = disc_model(reg_model_out)
@@ -182,8 +185,12 @@ class FacialGAN:
         t_pn = hm_point_tensor[1]
 
         t_pn_img = Lambda(lambda x: self._convert_to_geometric(t_hm_cp, tf.cast(x, 'int64')))(t_pn)
-        t_fused = keras.layers.concatenate([t_hm, t_pn_img])
+        # t_pn_img = self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64'))
 
+        t_fused = keras.layers.concatenate([t_hm[0], t_pn_img[0]], axis=0)
+        # print(tf.shape(t_fused))
+
+        # t_fused = tf.concat([t_hm, t_pn_img], axis=-1)
         # t_pn_1 = Lambda(lambda t_p:  self._convert_to_geometric(t_p))(t_pn)
         # t_pn = K.variable(np.zeros([56, 56, 1]))
         # t_pn = K.expand_dims(t_pn, axis=0)
@@ -208,20 +215,40 @@ class FacialGAN:
         img_indices = tf.constant([[x] for x in range(LearningConfig.batch_size)])
         img_updates = tf.zeros([LearningConfig.batch_size, InputDataSize.hm_size,
                                 InputDataSize.hm_size, self.num_face_graph_elements], dtype=tf.float32)
-        tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
+        hm_img = tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
 
         '''convert two_d_coords to facial part:'''
         sep_1_d_cord = self._slice_face_graph(coordinates)
 
         '''convert all points to 2d:'''
+        counter = 0
+        indices = []
         for cord_item_normal in sep_1_d_cord:
             '''convert to hm_scale: from  { from (-0.5, -0.5): (0.5, 0.5) => (0, 0): (56, 56)}'''
             cord_item = tf.map_fn(fn=lambda landmark: InputDataSize.hm_center + landmark * InputDataSize.hm_size,
                                   elems=cord_item_normal)
+            '''convert to 2d'''
             two_d_coords = tf.reshape(tensor=cord_item, shape=[-1, cord_item.shape[1] // 2, 2])  # ?(batch_size)*k*2
-            '''Then, for each 2d layer,scatter it to a 56*56 image (our hm_img)'''
+            indices.append(self._create_2d_indices(two_d_coords, counter))
+            counter += counter
 
-        return hm_img
+        '''Then, for each 2d layer,scatter it to a 56*56 image (our hm_img)'''
+        merged_indices = list(itertools.chain.from_iterable(indices))
+        img_updates = tf.ones(shape=len(merged_indices), dtype=tf.float32)
+        hm_img_o = tf.tensor_scatter_nd_update(hm_img, merged_indices, img_updates)
+        o_T = tf.add(hm_img, hm_img_o)
+        return o_T
+
+    def _create_2d_indices(self, two_d_coords, counter):
+        # indices = np.zeros([LearningConfig.batch_size, two_d_coords.shape[1], two_d_coords.shape[2], 1])
+        indices = []
+        for batch_indx in range(LearningConfig.batch_size):  # batch
+            for x_indx in range(two_d_coords.shape[1]):  # cordinates
+                x = two_d_coords[batch_indx, x_indx][0]
+                y = two_d_coords[batch_indx, x_indx][1]
+                item = [batch_indx, x, y, counter]
+                indices.append(item)
+        return indices
 
     def _slice_face_graph(self, coordinates):
         # two_d_coords = tf.reshape(tensor=coordinates, shape=[-1, self.num_landmark//2, 2])

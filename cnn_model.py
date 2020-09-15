@@ -59,7 +59,7 @@ class CNNModel:
         :param num_landmark:
         :return: model
         """
-        eff_net = efn.EfficientNetB7(include_top=True,
+        eff_net = efn.EfficientNetB0(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
@@ -79,7 +79,7 @@ class CNNModel:
         :param num_landmark:
         :return: model
         """
-        eff_net = efn.EfficientNetB7(include_top=True,
+        eff_net = efn.EfficientNetB0(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
