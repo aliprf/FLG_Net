@@ -13,15 +13,16 @@ from datetime import datetime
 from sklearn.utils import shuffle
 import os
 from sklearn.model_selection import train_test_split
-from numpy import save, load, asarray
+from numpy import save, load
 import os.path
 from keras import losses
 import csv
 from skimage.io import imread
 from keras.models import Model
+from keras.utils.vis_utils import plot_model
+import itertools
 
 tf.logging.set_verbosity(tf.logging.ERROR)
-import itertools
 
 
 class FacialGAN:
@@ -72,18 +73,18 @@ class FacialGAN:
         """
 
         '''Creating models:'''
-        reg_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape_reg)
-        disc_model = self._create_discriminator_net(input_tensor=None, input_shape=self.input_shape_disc)
+        regressor_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape_reg)
+        discriminator_model = self._create_discriminator_net(input_tensor=None, input_shape=self.input_shape_disc)
 
         '''Setting up GAN here:'''
         # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
         # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
 
-        reg_model.trainable = False
+        # regressor_model.trainable = False
         gan_model_input = Input(shape=self.input_shape_reg)
-        reg_model_out = self._fuse_hm_and_points(reg_model(gan_model_input))
+        reg_model_out = self._fuse_hm_and_points(regressor_model(gan_model_input))
 
-        gan_model_output = disc_model(reg_model_out)
+        gan_model_output = discriminator_model(reg_model_out)
 
         gan_model = Model(gan_model_input, outputs=gan_model_output)
 
@@ -92,9 +93,16 @@ class FacialGAN:
 
         gan_model.summary()
         '''save GAN Model'''
-        model_json = gan_model.to_json()
-        with open("gan_model.json", "w") as json_file:
-            json_file.write(model_json)
+        gan_model.save_weights('gw.h5')
+        plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
+
+        # xx = tf.keras.models.load_model(gan_model, 'gan_model.h5')
+        # tf.keras.models.save_model(gan_model, 'gan_model.h5')
+
+        # model_json = gan_model.to_json()
+        #
+        # with open("gan_model.json", "w") as json_file:
+        #     json_file.write(model_json)
 
         '''create train, validation, test data iterator'''
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
@@ -102,8 +110,8 @@ class FacialGAN:
         '''Save both model metrics in  a CSV file'''
         log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
         metrics_names = []
-        metrics_names.append('geo_' + metric for metric in reg_model.metrics_names)
-        metrics_names.append('disc_' + metric for metric in disc_model.metrics_names)
+        metrics_names.append('geo_' + metric for metric in regressor_model.metrics_names)
+        metrics_names.append('disc_' + metric for metric in discriminator_model.metrics_names)
         metrics_names.append('epoch')
         self._write_loss_log(log_file_name, metrics_names)
 
@@ -186,10 +194,13 @@ class FacialGAN:
         # t_pn_img = Lambda(self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64')))
         # t_pn_img = self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64'))
 
-        t_fused = self._fuse_tensors(t_hm, t_pn_img)
+        t_fused = Lambda(lambda x: self._fuse_tensors(t_hm, x))(t_pn_img)
+
         # print(tf.shape(t_fused))
 
-        # t_fused = tf.concat([t_hm, t_pn_img], axis=-1)
+        # t_fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
+
+
         # t_pn_1 = Lambda(lambda t_p:  self._convert_to_geometric(t_p))(t_pn)
         # t_pn = K.variable(np.zeros([56, 56, 1]))
         # t_pn = K.expand_dims(t_pn, axis=0)
@@ -204,20 +215,31 @@ class FacialGAN:
         return t_fused
 
     def _fuse_tensors(self, t_hm, t_pn_img):
-        t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1],tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
-        t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1],tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
 
-        # t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
+        # t_hm_shape = t_hm.get_shape().as_list()
+
+        # t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1], tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
+
+        t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
 
         # fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
         # fused = keras.layers.concatenate([t_hm, t_pn_img], axis=-1)
         # fused = Lambda(lambda x: keras.layers.concatenate([t_hm, t_pn_img], axis=3))
-        fused = Lambda(lambda x: tf.concat([t_hm, t_pn_img], axis=-1))
+        # fused = Lambda(lambda x: tf.concat([t_hm, t_pn_img], axis=-1))
         # fused = Lambda(tf.concat([t_hm, t_pn_img], axis=-1))
         # fused = tf.concat([t_hm, t_pn_img], axis=-1)
         # fused = Lambda(keras.layers.Concatenate()([t_hm, t_pn_img]))
         # fused = keras.layers.Concatenate()([t_hm, t_pn_img])
-        return fused
+
+        # t_fused = tf.math.multiply(t_pn_img, t_hm)
+
+        # print(t_pn_img.get_shape().as_list())
+        # print(t_hm.get_shape().as_list())
+
+        # t_fused = keras.layers.Concatenate([t_hm, t_pn_img], axis=-1)
+        t_fused = keras.layers.Concatenate()([t_hm, t_pn_img])
+
+        return t_fused
 
     def _convert_to_geometric(self, hm_img, coordinates):
         """
