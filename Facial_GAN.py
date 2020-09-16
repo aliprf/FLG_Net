@@ -185,9 +185,10 @@ class FacialGAN:
         t_pn = hm_point_tensor[1]
 
         t_pn_img = Lambda(lambda x: self._convert_to_geometric(t_hm_cp, tf.cast(x, 'int64')))(t_pn)
+        # t_pn_img = Lambda(self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64')))
         # t_pn_img = self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64'))
 
-        t_fused = keras.layers.concatenate([t_hm[0], t_pn_img[0]], axis=0)
+        t_fused = self._fuse_tensors(t_hm, t_pn_img)
         # print(tf.shape(t_fused))
 
         # t_fused = tf.concat([t_hm, t_pn_img], axis=-1)
@@ -203,6 +204,22 @@ class FacialGAN:
 
         # t_fused = tf.math.reduce_sum([t_hm, t_hm], axis=3)
         return t_fused
+
+    def _fuse_tensors(self, t_hm, t_pn_img):
+        t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1],tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
+        t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1],tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
+
+        # t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
+
+        # fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
+        # fused = keras.layers.concatenate([t_hm, t_pn_img], axis=-1)
+        # fused = Lambda(lambda x: keras.layers.concatenate([t_hm, t_pn_img], axis=3))
+        fused = Lambda(lambda x: tf.concat([t_hm, t_pn_img], axis=-1))
+        # fused = Lambda(tf.concat([t_hm, t_pn_img], axis=-1))
+        # fused = tf.concat([t_hm, t_pn_img], axis=-1)
+        # fused = Lambda(keras.layers.Concatenate()([t_hm, t_pn_img]))
+        # fused = keras.layers.Concatenate()([t_hm, t_pn_img])
+        return fused
 
     def _convert_to_geometric(self, hm_img, coordinates):
         """
