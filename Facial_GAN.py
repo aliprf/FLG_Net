@@ -123,7 +123,7 @@ class FacialGAN:
                 try:
                     images, heatmaps, points = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
 
-                    predicted_heatmaps, predicted_points = reg_model.predict_on_batch(images)
+                    predicted_heatmaps, predicted_points = regressor_model.predict_on_batch(images)
 
                     disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps, predicted_heatmaps,
                                                                              points, predicted_points)

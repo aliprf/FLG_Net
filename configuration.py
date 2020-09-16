@@ -184,24 +184,18 @@ class IbugConf:
     '''server_config'''
     # _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
     # _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
-    _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local
+    # _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
+    _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
 
     img_path_prefix = _Ibug_prefix_path + 'all/'
-    # rotated_img_path_prefix = _Ibug_prefix_path + '0_rotated/'
     rotated_img_path_prefix = _Ibug_prefix_path + '1_train_images_pts_dir/'
     train_images_dir = _Ibug_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = _Ibug_prefix_path + '2_normalized_npy_dir/'
     pose_npy_dir = _Ibug_prefix_path + '4_pose_npy_dir/'
 
-    tf_train_path = _Ibug_prefix_path + 'train.tfrecords'
-    tf_evaluation_path = _Ibug_prefix_path + 'evaluation.tfrecords'
-
     tf_test_path_full = _Ibug_prefix_path + 'test_full.tfrecords'
     tf_test_path_common = _Ibug_prefix_path + 'test_common.tfrecords'
     tf_test_path_challenging = _Ibug_prefix_path + 'test_challenging.tfrecords'
-
-    tf_train_path_95 = _Ibug_prefix_path + 'train_95.tfrecords'
-    tf_evaluation_path_95 = _Ibug_prefix_path + 'evaluation_95.tfrecords'
 
     test_img_path_prefix = _Ibug_prefix_path + 'test_all/'
     test_images_dir = _Ibug_prefix_path + 'test_images_pts_dir/'

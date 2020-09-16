@@ -576,8 +576,15 @@ class TFRecordUtility:
     # def retrive_hm_and_test(self):
 
     def create_image_and_labels_name(self, dataset_name):
-        images_dir = IbugConf.train_images_dir
-        lbls_dir = IbugConf.train_hm_dir
+        if dataset_name == DatasetName.ibug:
+            images_dir = IbugConf.train_images_dir
+            lbls_dir = IbugConf.train_hm_dir
+        elif dataset_name == DatasetName.cofw:
+            images_dir = CofwConf.train_images_dir
+            lbls_dir = CofwConf.train_hm_dir
+        elif dataset_name == DatasetName.wflw:
+            images_dir = WflwConf.train_images_dir
+            lbls_dir = WflwConf.train_hm_dir
 
         img_filenames = []
         lbls_filenames = []
