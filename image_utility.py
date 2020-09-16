@@ -16,7 +16,7 @@ from skimage.transform import resize
 from skimage import transform
 from skimage.transform import SimilarityTransform, AffineTransform
 import random
-from configuration import  DatasetName
+from configuration import  DatasetName, LearningConfig, InputDataSize
 
 class ImageUtility:
 
@@ -32,15 +32,15 @@ class ImageUtility:
             img_arr, points_arr = self.cropImg(_image, x_points, y_points, no_padding=False)
             # img_arr = output_img
             # points_arr = t_label
-            '''resize image to 224*224'''
+            '''resize image to InputDataSize.image_input_size*InputDataSize.image_input_size'''
             resized_img = resize(img_arr,
-                                 (224, 224, 3),
+                                 (InputDataSize.image_input_size, InputDataSize.image_input_size, 3),
                                  anti_aliasing=True)
             dims = img_arr.shape
             height = dims[0]
             width = dims[1]
-            scale_factor_y = 224 / height
-            scale_factor_x = 224 / width
+            scale_factor_y = InputDataSize.image_input_size / height
+            scale_factor_x = InputDataSize.image_input_size / width
 
             '''rescale and retrieve landmarks'''
             landmark_arr_xy, landmark_arr_x, landmark_arr_y = \
@@ -49,7 +49,7 @@ class ImageUtility:
                                       scale_factor_y=scale_factor_y)
 
             min_b = 0.0
-            max_b = 224
+            max_b = InputDataSize.image_input_size
             if not(min(landmark_arr_x) < min_b or min(landmark_arr_y) < min_b or
                    max(landmark_arr_x) > max_b or max(landmark_arr_y) > max_b):
 
@@ -121,15 +121,15 @@ class ImageUtility:
             img_arr, points_arr = self.cropImg(output_img, x_points, y_points, no_padding=False)
             # img_arr = output_img
             # points_arr = t_label
-            '''resize image to 224*224'''
+            '''resize image to InputDataSize.image_input_size*InputDataSize.image_input_size'''
             resized_img = resize(img_arr,
-                                 (224, 224, 3),
+                                 (InputDataSize.image_input_size, InputDataSize.image_input_size, 3),
                                  anti_aliasing=True)
             dims = img_arr.shape
             height = dims[0]
             width = dims[1]
-            scale_factor_y = 224 / height
-            scale_factor_x = 224 / width
+            scale_factor_y = InputDataSize.image_input_size / height
+            scale_factor_x = InputDataSize.image_input_size / width
 
             '''rescale and retrieve landmarks'''
             landmark_arr_xy, landmark_arr_x, landmark_arr_y = \
@@ -138,13 +138,13 @@ class ImageUtility:
                                       scale_factor_y=scale_factor_y)
 
             min_b = 0.0
-            max_b = 224
+            max_b = InputDataSize.image_input_size
             if dataset_name == DatasetName.cofw:
                 min_b = 5.0
                 max_b = 214
 
             if not(min(landmark_arr_x) < 0 or min(landmark_arr_y) < min_b or
-                   max(landmark_arr_x) > 224 or max(landmark_arr_y) > max_b):
+                   max(landmark_arr_x) > InputDataSize.image_input_size or max(landmark_arr_y) > max_b):
 
                 # self.print_image_arr(str(landmark_arr_x[0]), resized_img, landmark_arr_x, landmark_arr_y)
 
@@ -220,15 +220,15 @@ class ImageUtility:
                                                                        scale_factor_x=1, scale_factor_y=1)
         img_arr, points_arr = self.cropImg(img_arr, x_points, y_points)
 
-        '''resize image to 224*224'''
+        '''resize image to InputDataSize.image_input_size*InputDataSize.image_input_size'''
         resized_img = resize(img_arr,
-                             (224, 224, 3),
+                             (InputDataSize.image_input_size, InputDataSize.image_input_size, 3),
                              anti_aliasing=True)
         dims = img_arr.shape
         height = dims[0]
         width = dims[1]
-        scale_factor_y = 224 / height
-        scale_factor_x = 224 / width
+        scale_factor_y = InputDataSize.image_input_size / height
+        scale_factor_x = InputDataSize.image_input_size / width
 
         '''rescale and retrieve landmarks'''
         landmark_arr_xy, landmark_arr_x, landmark_arr_y = \
@@ -289,15 +289,22 @@ class ImageUtility:
 
     def __noisy(self, image):
         noise_typ = random.randint(0, 5)
-        # if True or noise_typ == 0 :#"gauss":
-        #     row, col, ch = image.shape
-        #     mean = 0
-        #     var = 0.001
-        #     sigma = var ** 0.1
-        #     gauss = np.random.normal(mean, sigma, (row, col, ch))
-        #     gauss = gauss.reshape(row, col, ch)
-        #     noisy = image + gauss
-        #     return noisy
+        if noise_typ == 0:
+            s_vs_p = 0.1
+            amount = 0.1
+            out = np.copy(image)
+            # Salt mode
+            num_salt = np.ceil(amount * image.size * s_vs_p)
+            coords = [np.random.randint(0, i - 1, int(num_salt))
+                      for i in image.shape]
+            out[coords] = 1
+
+            # Pepper mode
+            num_pepper = np.ceil(amount * image.size * (1. - s_vs_p))
+            coords = [np.random.randint(0, i - 1, int(num_pepper))
+                      for i in image.shape]
+            out[coords] = 0
+            return out
         if 1 <= noise_typ <= 2:# "s&p":
             row, col, ch = image.shape
             s_vs_p = 0.5

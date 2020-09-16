@@ -1849,20 +1849,21 @@ class TFRecordUtility:
         if tf_evaluation_path is not None:
             writer_evaluate.close()
 
-    def _create_face_graph(self, dataset_name, dataset_type):
+    def create_face_graph(self, dataset_name, dataset_type):
         if dataset_name == DatasetName.ibug:
             img_dir = IbugConf.train_images_dir
             landmarks_dir = IbugConf.normalized_points_npy_dir
-            num_train_samples = IbugConf.number_of_train_sample
-
+            face_graph_dir = IbugConf.graph_face_dir
         if dataset_name == DatasetName.wflw:
             img_dir = WflwConf.train_images_dir
             landmarks_dir = WflwConf.normalized_points_npy_dir
+            face_graph_dir = WflwConf.graph_face_dir
             num_train_samples = WflwConf.number_of_train_sample
 
         if dataset_name == DatasetName.cofw:
             img_dir = CofwConf.train_images_dir
             landmarks_dir = CofwConf.normalized_points_npy_dir
+            face_graph_dir = CofwConf.graph_face_dir
             num_train_samples = CofwConf.number_of_train_sample
 
         counter= 0
@@ -1874,23 +1875,23 @@ class TFRecordUtility:
                 img = Image.open(img_file_name)
 
                 '''load landmark npy, (has been augmented already)'''
+                fg_file_name = os.path.join(face_graph_dir, file[:-3] + "npy")
                 landmark_file_name = os.path.join(landmarks_dir, file[:-3] + "npy")
                 if not os.path.exists(landmark_file_name):
                     continue
                 landmark = load(landmark_file_name)
 
+                fg = None
                 if dataset_name == DatasetName.ibug:
-                    self._create_ibug_graph(counter, img, landmark)
-
-                if dataset_name == DatasetName.cofw:
-                    self._create_cofw_graph(counter, img, landmark)
-
-                if dataset_name == DatasetName.wflw:
-                    self._create_wflw_graph(counter, img, landmark)
-
+                    fg = self._create_ibug_graph(counter, img, landmark, face_graph_dir)
+                elif dataset_name == DatasetName.cofw:
+                    fg = self._create_cofw_graph(counter, img, landmark, face_graph_dir)
+                elif dataset_name == DatasetName.wflw:
+                    fg = self._create_wflw_graph(counter, img, landmark, face_graph_dir)
                 counter += 1
+                np.save(fg_file_name, fg)
 
-    def _create_wflw_graph(self, counter, img, landmark):
+    def _create_wflw_graph(self, counter, img, landmark, face_graph_dir):
         face = np.array(landmark[0:66])
         l_ebrow = np.append(landmark[66:84], landmark[66:68])
         r_ebrow = np.append(landmark[84:102], landmark[84:86])
@@ -1922,7 +1923,7 @@ class TFRecordUtility:
         #     imgpr.print_image_arr_heat('zHM_' + str(counter)+'_'+str(i), hm_arr[i])
         imgpr.print_partial_heat('z_HM' + str(counter)+'_', np.array(hm_arr), True)
 
-    def _create_cofw_graph(self, counter, img, landmark):
+    def _create_cofw_graph(self, counter, img, landmark, face_graph_dir):
 
         l_ebrow = np.array([landmark[0:2], landmark[8:10], landmark[4:6], landmark[10:12], landmark[0:2]]).reshape([10])
         r_ebrow = np.array([landmark[2:4], landmark[12:14], landmark[6:8], landmark[14:16], landmark[2:4]]).reshape([10])
@@ -1950,7 +1951,7 @@ class TFRecordUtility:
         imgpr.print_partial_heat('z_HM' + str(counter) + '_', np.array(hm_arr), True)
         imgpr.print_image_arr('z_img' + str(counter) + '_', img, [],[])
 
-    def _create_ibug_graph(self, counter, img, landmark):
+    def _create_ibug_graph(self, counter, img, landmark, face_graph_dir):
 
         face = landmark[0:34] # line
         l_ebrow = landmark[34:44] # line
@@ -1982,10 +1983,12 @@ class TFRecordUtility:
         # imgpr.print_partial(counter, img, landmark_arr)
         hm_arr = self.generate_partial_hm(InputDataSize.image_input_size // 4, InputDataSize.image_input_size // 4,
                                           landmark_arr, s=1.8)
+        hm_arr = np.array(hm_arr)
         # for i in range(len(hm_arr)):
         #     imgpr.print_image_arr_heat('zHM_' + str(counter)+'_'+str(i), hm_arr[i])
-        imgpr.print_partial_heat('z_HM' + str(counter) + '_', np.array(hm_arr), True)
+        # imgpr.print_partial_heat('z_HM' + str(counter) + '_', np.array(hm_arr), True)
         # imgpr.print_image_arr('z_img' + str(counter) + '_', img, [], [])
+        return hm_arr
 
     def _create_tfrecord_from_npy(self, dataset_name, dataset_type, isTest, accuracy=100):
         """we use this function when we have already created and nrmalzed both landmarks and poses"""

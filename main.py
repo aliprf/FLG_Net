@@ -14,34 +14,18 @@ import keras
 import keras.backend as K
 
 if __name__ == '__main__':
-    # indices = tf.random.uniform(shape=[4, 3, 2], maxval=2, dtype=tf.int32)
-    # indices = tf.constant([[0, 0,0, 0], [1, 1,1, 0]], dtype=tf.int32)
-    # print(K.eval(indices))
-    #
-    # img_updates = tf.ones([2], dtype=tf.float32)
-    # hm_img = tf.zeros([2, 5, 5, 1], dtype=tf.float32)
-    # hm_img_1 = tf.tensor_scatter_nd_update(hm_img, indices, img_updates)
-    # print(K.eval(hm_img_1))
-    #
-    # print('1')
-    fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
-                   discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
-                   input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                   input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size, IbugConf.num_face_graph_elements])
-    fg.train_network()
 
-    # x = np.random.normal(size=100)
-    # imgp.print_histogram(x)
-    # imgp.print_histogram2d(data[0], data[1])
-    # imgp.print_histogram1()
-
+    # fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
+    #                discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
+    #                input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #                input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size, IbugConf.num_face_graph_elements])
+    # fg.train_network()
 
     pca_utility = PCAUtility()
     cnn_model = CNNModel()
     image_utility = ImageUtility()
 
-    tf_record_util = TFRecordUtility(CofwConf.num_of_landmarks*2)
-    # tf_record_util._create_face_graph(dataset_name=DatasetName.cofw, dataset_type=None)
+    # tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
 
     # tf_record_util.test_hm_accuracy()
     # tf_record_util.create_adv_att_img_hm()
@@ -55,12 +39,14 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    tf_record_util = TFRecordUtility(CofwConf.num_of_landmarks*2)
-    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.cofw)
+    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
+    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
     # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
     '''     normalize the points and save'''
-    # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.cofw)
+    # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
     # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
+    # tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
+
 
     '''     create and save PCA objects'''
     # pca_utility.create_pca_from_points(DatasetName.wflw, 80)

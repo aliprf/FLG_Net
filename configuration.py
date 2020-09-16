@@ -101,6 +101,7 @@ class WflwConf:
     rotated_img_path_prefix = Wflw_prefix_path + '1_train_images_pts_dir/'
     train_images_dir = Wflw_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = Wflw_prefix_path + '2_normalized_npy_dir/'
+    graph_face_dir = Wflw_prefix_path + '3_graph_face/'
     pose_npy_dir = Wflw_prefix_path + '4_pose_npy_dir/'
 
     test_img_path_prefix = Wflw_prefix_path + 'test_all/'
@@ -152,6 +153,7 @@ class CofwConf:
     rotated_img_path_prefix = Cofw_prefix_path + '1_train_images_pts_dir/'
     train_images_dir = Cofw_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = Cofw_prefix_path + '2_normalized_npy_dir/'
+    graph_face_dir = Cofw_prefix_path + '3_graph_face/'
     pose_npy_dir = Cofw_prefix_path + '4_pose_npy_dir/'
 
     test_img_path_prefix = Cofw_prefix_path + 'test_all/'
@@ -184,13 +186,14 @@ class IbugConf:
     '''server_config'''
     # _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
     # _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
-    # _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
-    _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
+    _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
+    # _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
 
     img_path_prefix = _Ibug_prefix_path + 'all/'
     rotated_img_path_prefix = _Ibug_prefix_path + '1_train_images_pts_dir/'
     train_images_dir = _Ibug_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = _Ibug_prefix_path + '2_normalized_npy_dir/'
+    graph_face_dir = _Ibug_prefix_path + '3_graph_face/'
     pose_npy_dir = _Ibug_prefix_path + '4_pose_npy_dir/'
 
     tf_test_path_full = _Ibug_prefix_path + 'test_full.tfrecords'
