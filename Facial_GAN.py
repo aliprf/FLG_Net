@@ -1,5 +1,3 @@
-from past.types import basestring
-
 from configuration import DatasetName, IbugConf, LearningConfig, CofwConf, WflwConf, InputDataSize
 from tf_record_utility import TFRecordUtility
 from cnn_model import CNNModel

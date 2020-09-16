@@ -1,10 +1,10 @@
 # for cuda 9
 # pip install torch==1.2.0+cu92 torchvision==0.4.0+cu92 -f https://download.pytorch.org/whl/torch_stable.html
 #
-torch
-torchvision
+#torch
+#torchvision
 bottleneck
-tensorflow==1.14
+tensorflow==1.14.0
 #tensorflow-gpu==1.14
 keras==2.2.4
 numpy

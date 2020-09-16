@@ -13,6 +13,7 @@ data/*
 train_logs/*
 file_names/*
 venv/*
+env_3/*
 logs/*
 
 .idea/*
