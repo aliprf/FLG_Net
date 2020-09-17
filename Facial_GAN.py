@@ -21,6 +21,8 @@ from skimage.io import imread
 from keras.models import Model
 from keras.utils.vis_utils import plot_model
 import itertools
+from skimage.transform import resize
+from image_utility import ImageUtility
 
 tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -117,22 +119,22 @@ class FacialGAN:
         for epoch in range(LearningConfig.epochs):
             loss = []
             for batch_index in range(step_per_epoch):
-                try:
-                    images, heatmaps, points = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                # try:
+                images, heatmaps, points = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
 
-                    predicted_heatmaps, predicted_points = regressor_model.predict_on_batch(images)
+                predicted_heatmaps, predicted_points = regressor_model.predict_on_batch(images)
 
-                    disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps, predicted_heatmaps, points,
-                                                                             predicted_points, images)
+                disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps, predicted_heatmaps, points,
+                                                                         predicted_points, images)
 
-                    d_loss = regressor_model.train_on_batch(disc_x, disc_y)
+                d_loss = regressor_model.train_on_batch(disc_x, disc_y)
 
-                    g_loss = gan_model.train_on_batch(imgs, y_gen)
+                g_loss = gan_model.train_on_batch(imgs, y_gen)
 
-                    print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
-                          f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
-                except Exception as e:
-                    print('Faced Exception in train: ' + str(e))
+                print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
+                      f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
+                # except Exception as e:
+                #     print('Faced Exception in train: ' + str(e))
 
             loss.append(epoch)
             self._write_loss_log(log_file_name, loss)
@@ -177,16 +179,63 @@ class FacialGAN:
                       metrics=['accuracy'])
         return model
 
-    def _prepare_discriminator_model_input(self, heatmaps, predicted_heatmaps, points, predicted_points, img):
+    def _prepare_discriminator_model_input(self, heatmaps_gr, heatmaps_pr, points_gr, points_pr, img):
         """
         at the first step, we fuse concate heatmaps + 2d_points.Then create real/fake labels
-        :param heatmaps:
-        :param predicted_heatmaps:
-        :param points:
-        :param predicted_points:
+        :param heatmaps_gr:
+        :param heatmaps_pr:
+        :param points_gr:
+        :param points_pr:
+        :param img:
         :return:
         """
+
+        '''resize img to hm_size:'''
+        # img = tf.image.resize(img, [InputDataSize.hm_size, InputDataSize.hm_size]) --> the result will be a tensor
+        img = resize(img, (LearningConfig.batch_size, InputDataSize.hm_size, InputDataSize.hm_size, 3))
+        '''convert points to 2d facial graph:'''
+        fg_gt = self._points_to_2d_face_graph(points_gr)
+        fg_pr = self._points_to_2d_face_graph(points_pr)
+        '''concat hm, 2d_points, img '''
+        '''create real/fake labels and attach to the input data'''
+
         return 0, 0
+
+    def _points_to_2d_face_graph(self, _points):
+        """
+        :param points: [bs, 136]
+        :return: [bs, 56, 56, num_fg]
+        """
+        '''rescale points'''
+        points = np.zeros([LearningConfig.batch_size, self.num_landmark])
+        image_utility = ImageUtility()
+        indx = 0
+        for item in _points:
+            point_scaled, _, _ = image_utility.create_landmarks_from_normalized(item, InputDataSize.image_input_size,
+                                                                                InputDataSize.image_input_size,
+                                                                                InputDataSize.img_center,
+                                                                                InputDataSize.img_center)
+            points[indx, :] = point_scaled
+            indx += 1
+
+        '''create partial parts: '''
+        partial_points = self._slice_face_graph(points)
+        '''convert from flatten to 2d'''
+        points_2d = []
+        for pnt in partial_points:
+            points_2d.append(pnt.reshape([LearningConfig.batch_size, len(pnt[1])//2, 2]))
+        '''create the spare img for each facial part:'''
+        hm_img = np.zeros([LearningConfig.batch_size, InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
+        # bs, 12 * 2
+        for i in range(LearningConfig.batch_size):
+            for j in range(self.num_face_graph_elements):
+                t_hm = np.zeros([InputDataSize.hm_size, InputDataSize.hm_size])
+                for x_y in points_2d[j][i]:
+                    t_hm[int(x_y[0]), int(x_y[1])] = 1
+                hm_img[i, :, :, j] = t_hm
+
+
+        return hm_img
 
     def _fuse_hm_and_points(self, regressor_output, regressor_input):
         """
@@ -214,22 +263,6 @@ class FacialGAN:
 
         t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size,
                                                       self.num_face_graph_elements])
-
-        # fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
-        # fused = keras.layers.concatenate([t_hm, t_pn_img], axis=-1)
-        # fused = Lambda(lambda x: keras.layers.concatenate([t_hm, t_pn_img], axis=3))
-        # fused = Lambda(lambda x: tf.concat([t_hm, t_pn_img], axis=-1))
-        # fused = Lambda(tf.concat([t_hm, t_pn_img], axis=-1))
-        # fused = tf.concat([t_hm, t_pn_img], axis=-1)
-        # fused = Lambda(keras.layers.Concatenate()([t_hm, t_pn_img]))
-        # fused = keras.layers.Concatenate()([t_hm, t_pn_img])
-
-        # t_fused = tf.math.multiply(t_pn_img, t_hm)
-
-        # print(t_pn_img.get_shape().as_list())
-        # print(t_hm.get_shape().as_list())
-
-        # t_fused = keras.layers.Concatenate([t_hm, t_pn_img], axis=-1)
         t_fused = keras.layers.Concatenate()([t_hm, t_pn_img])
 
         return t_fused
