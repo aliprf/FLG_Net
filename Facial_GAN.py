@@ -85,7 +85,7 @@ class FacialGAN:
 
         # regressor_model.trainable = False
         gan_model_input = Input(shape=self.input_shape_reg)
-        reg_model_out = self._fuse_hm_and_points(regressor_model(gan_model_input))
+        reg_model_out = self._fuse_hm_and_points(regressor_model(gan_model_input), gan_model_input)
 
         gan_model_output = discriminator_model(reg_model_out)
 
@@ -96,14 +96,12 @@ class FacialGAN:
 
         gan_model.summary()
         '''save GAN Model'''
-        gan_model.save_weights('gw.h5')
-        plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
+        # gan_model.save_weights('gw.h5')
+        # plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
 
         # xx = tf.keras.models.load_model(gan_model, 'gan_model.h5')
         # tf.keras.models.save_model(gan_model, 'gan_model.h5')
-
         # model_json = gan_model.to_json()
-        #
         # with open("gan_model.json", "w") as json_file:
         #     json_file.write(model_json)
 
@@ -190,37 +188,22 @@ class FacialGAN:
         """
         return 0, 0
 
-    def _fuse_hm_and_points(self, hm_point_tensor):
+    def _fuse_hm_and_points(self, regressor_output, regressor_input):
         """
 
-        :param hm_point_tensor:[ [?, ?, ?, 8], [?, 136] ]
-        :return: [56,56,1] hm_+_points(fused in one layer) or [56,56,2] ==> hm, points
+        :param regressor_output:[ [?, ?, ?, 8], [?, 136] ]
+        :return: [bs, 56, 56, num_fg*2] ==> hm, points
         """
-        t_hm = hm_point_tensor[0]
-        t_hm_cp = hm_point_tensor[0]
-        t_pn = hm_point_tensor[1]
+        t_hm = regressor_output[0]
+        t_hm_cp = regressor_output[0]
+        t_pn = regressor_output[1]
+
+        t_inp_img = tf.image.resize(regressor_input, [InputDataSize.hm_size, InputDataSize.hm_size])
+        t_hm = keras.layers.Concatenate()([t_hm, t_inp_img])
+        # t_hm = tf.concat([t_hm, t_inp_img], axis=-1)
 
         t_pn_img = Lambda(lambda x: self._convert_to_geometric(t_hm_cp, tf.cast(x, 'int64')))(t_pn)
-        # t_pn_img = Lambda(self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64')))
-        # t_pn_img = self._convert_to_geometric(t_hm_cp, tf.cast(t_pn, 'int64'))
-
         t_fused = Lambda(lambda x: self._fuse_tensors(t_hm, x))(t_pn_img)
-
-        # print(tf.shape(t_fused))
-
-        # t_fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
-
-        # t_pn_1 = Lambda(lambda t_p:  self._convert_to_geometric(t_p))(t_pn)
-        # t_pn = K.variable(np.zeros([56, 56, 1]))
-        # t_pn = K.expand_dims(t_pn, axis=0)
-        # t_fused = keras.layers.concatenate([t_hm, t_pn_1])
-
-        # t_hm_np = K.variable(K.eval(t_hm))
-        # t_fused = K.concatenate([t_hm_np, self._convert_to_geometric(t_pn)])
-        # t_fused = keras.layers.concatenate([t_hm_np, self._convert_to_geometric(t_pn)])
-        # t_fused = Lambda(lambda x: x)(t_fused)
-
-        # t_fused = tf.math.reduce_sum([t_hm, t_hm], axis=3)
         return t_fused
 
     def _fuse_tensors(self, t_hm, t_pn_img):
