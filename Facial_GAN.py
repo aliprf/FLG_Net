@@ -41,7 +41,7 @@ class FacialGAN:
             self.num_landmark = IbugConf.num_of_landmarks * 2
             self.num_face_graph_elements = IbugConf.num_face_graph_elements
             self.train_images_dir = IbugConf.train_images_dir
-            self.train_hm_dir = IbugConf.train_hm_dir
+            self.train_hm_dir = IbugConf.graph_face_dir
             self.train_point_dir = IbugConf.normalized_points_npy_dir
             self.num_face_graph_elements = IbugConf.num_face_graph_elements
         elif dataset_name == DatasetName.cofw:
@@ -49,7 +49,7 @@ class FacialGAN:
             self.num_landmark = CofwConf.num_of_landmarks * 2
             self.num_face_graph_elements = CofwConf.num_face_graph_elements
             self.train_images_dir = CofwConf.train_images_dir
-            self.train_hm_dir = CofwConf.train_hm_dir
+            self.train_hm_dir = CofwConf.graph_face_dir
             self.train_point_dir = CofwConf.normalized_points_npy_dir
             self.num_face_graph_elements = CofwConf.num_face_graph_elements
         elif dataset_name == DatasetName.wflw:
@@ -57,7 +57,7 @@ class FacialGAN:
             self.num_landmark = WflwConf.num_of_landmarks * 2
             self.num_face_graph_elements = WflwConf.num_face_graph_elements
             self.train_images_dir = WflwConf.train_images_dir
-            self.train_hm_dir = WflwConf.train_hm_dir
+            self.train_hm_dir = WflwConf.graph_face_dir
             self.train_point_dir = WflwConf.normalized_points_npy_dir
             self.num_face_graph_elements = WflwConf.num_face_graph_elements
         c_loss = Custom_losses(dataset_name, accuracy=100)
@@ -71,6 +71,9 @@ class FacialGAN:
         Training Network:
         :return:
         """
+
+        '''create train, validation, test data iterator'''
+        x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         '''Creating models:'''
         regressor_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape_reg)
@@ -104,15 +107,11 @@ class FacialGAN:
         # with open("gan_model.json", "w") as json_file:
         #     json_file.write(model_json)
 
-        '''create train, validation, test data iterator'''
-        x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
-
         '''Save both model metrics in  a CSV file'''
         log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
-        metrics_names = []
-        metrics_names.append('geo_' + metric for metric in regressor_model.metrics_names)
-        metrics_names.append('disc_' + metric for metric in discriminator_model.metrics_names)
-        metrics_names.append('epoch')
+        metrics_names = ['epoch']
+        for metric in regressor_model.metrics_names: metrics_names.append('reg_' + metric)
+        for metric in discriminator_model.metrics_names: metrics_names.append('disc_' + metric)
         self._write_loss_log(log_file_name, metrics_names)
 
         '''Start training on batch here:'''
@@ -125,12 +124,12 @@ class FacialGAN:
 
                     predicted_heatmaps, predicted_points = regressor_model.predict_on_batch(images)
 
-                    disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps, predicted_heatmaps,
-                                                                             points, predicted_points)
+                    disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps, predicted_heatmaps, points,
+                                                                             predicted_points, images)
 
-                    d_loss = reg_model.train_on_batch(disc_x, disc_y)
+                    d_loss = regressor_model.train_on_batch(disc_x, disc_y)
 
-                    g_loss = seq_model.train_on_batch(imgs, y_gen)
+                    g_loss = gan_model.train_on_batch(imgs, y_gen)
 
                     print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
                           f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
@@ -180,6 +179,17 @@ class FacialGAN:
                       metrics=['accuracy'])
         return model
 
+    def _prepare_discriminator_model_input(self, heatmaps, predicted_heatmaps, points, predicted_points, img):
+        """
+        at the first step, we fuse concate heatmaps + 2d_points.Then create real/fake labels
+        :param heatmaps:
+        :param predicted_heatmaps:
+        :param points:
+        :param predicted_points:
+        :return:
+        """
+        return 0, 0
+
     def _fuse_hm_and_points(self, hm_point_tensor):
         """
 
@@ -200,7 +210,6 @@ class FacialGAN:
 
         # t_fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
 
-
         # t_pn_1 = Lambda(lambda t_p:  self._convert_to_geometric(t_p))(t_pn)
         # t_pn = K.variable(np.zeros([56, 56, 1]))
         # t_pn = K.expand_dims(t_pn, axis=0)
@@ -220,7 +229,8 @@ class FacialGAN:
 
         # t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1], tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
 
-        t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
+        t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size,
+                                                      self.num_face_graph_elements])
 
         # fused = keras.layers.Concatenate(axis=-1)([t_hm, t_pn_img])
         # fused = keras.layers.concatenate([t_hm, t_pn_img], axis=-1)
@@ -293,7 +303,7 @@ class FacialGAN:
         if self.dataset_name == DatasetName.wflw:
             return 0
         elif self.dataset_name == DatasetName.cofw:
-           return 0
+            return 0
         elif self.dataset_name == DatasetName.ibug:
             sep_1_d_cord = [coordinates[:, 0:34], coordinates[:, 34:44], coordinates[:, 44:54], coordinates[:, 54:62],
                             coordinates[:, 60:72], coordinates[:, 54:72], coordinates[:, 72:84], coordinates[:, 84:96],
@@ -320,14 +330,14 @@ class FacialGAN:
 
     def _create_generators(self):
         """
-
+        check if we have the img & lbls name. and create in case we need it.
         :return:
         """
         fn_prefix = './file_names/' + self.dataset_name + '_'
         x_trains_path = fn_prefix + 'x_train_fns.npy'
-        x_validations_path = fn_prefix + 'x_train_fns.npy'
-        y_trains_path = fn_prefix + 'x_train_fns.npy'
-        y_validations_path = fn_prefix + 'x_train_fns.npy'
+        x_validations_path = fn_prefix + 'x_val_fns.npy'
+        y_trains_path = fn_prefix + 'y_train_fns.npy'
+        y_validations_path = fn_prefix + 'y_val_fns.npy'
 
         tf_utils = TFRecordUtility(number_of_landmark=self.num_landmark)
 

@@ -576,15 +576,20 @@ class TFRecordUtility:
     # def retrive_hm_and_test(self):
 
     def create_image_and_labels_name(self, dataset_name):
+        """
+        in this function we only save the names, not the paths:
+        :param dataset_name:
+        :return:
+        """
         if dataset_name == DatasetName.ibug:
             images_dir = IbugConf.train_images_dir
-            lbls_dir = IbugConf.train_hm_dir
+            lbls_dir = IbugConf.normalized_points_npy_dir
         elif dataset_name == DatasetName.cofw:
             images_dir = CofwConf.train_images_dir
-            lbls_dir = CofwConf.train_hm_dir
+            lbls_dir = CofwConf.normalized_points_npy_dir
         elif dataset_name == DatasetName.wflw:
             images_dir = WflwConf.train_images_dir
-            lbls_dir = WflwConf.train_hm_dir
+            lbls_dir = WflwConf.normalized_points_npy_dir
 
         img_filenames = []
         lbls_filenames = []
@@ -845,11 +850,14 @@ class TFRecordUtility:
         print('generate_hm_and_save COMPLETED!!!')
 
     def generate_partial_hm(self, height, width, landmarks_arr, s=3.0, upsample=True):
-        hm_ar =[]
+        hm_ar = np.zeros([width, height, len(landmarks_arr)])
+        _index = 0
         for landmark in landmarks_arr:
             point_wise_hm = self.generate_hm(height, width, landmark, s, upsample)
             partial_hm = np.sum(point_wise_hm, axis=2)
-            hm_ar.append(partial_hm)
+            hm_ar[:, :, _index] = partial_hm
+            _index += 1
+            # hm_ar.append(partial_hm)
         return hm_ar
 
     def generate_hm(self, height, width, landmarks, s=3.0, upsample=True):
@@ -1981,8 +1989,7 @@ class TFRecordUtility:
         landmark_arr.append(l_lip)
 
         # imgpr.print_partial(counter, img, landmark_arr)
-        hm_arr = self.generate_partial_hm(InputDataSize.image_input_size // 4, InputDataSize.image_input_size // 4,
-                                          landmark_arr, s=1.8)
+        hm_arr = self.generate_partial_hm(InputDataSize.hm_size, InputDataSize.hm_size, landmark_arr, s=1.8)
         hm_arr = np.array(hm_arr)
         # for i in range(len(hm_arr)):
         #     imgpr.print_image_arr_heat('zHM_' + str(counter)+'_'+str(i), hm_arr[i])
