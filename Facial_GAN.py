@@ -87,27 +87,27 @@ class FacialGAN:
         # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
         # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
 
-        # regressor_model.trainable = False
-        gan_model_input = Input(shape=self.input_shape_reg)
-        reg_model_out = self._fuse_hm_and_points(regressor_model(gan_model_input), gan_model_input)
+        regressor_model.trainable = False
+        discriminator_model.trainable = True
 
-        gan_model_output = discriminator_model(reg_model_out)
-
-        gan_model = Model(gan_model_input, outputs=gan_model_output)
-
+        gan_input = Input(shape=self.input_shape_reg)
+        reg_out = self._fuse_hm_and_points(regressor_model(gan_input), gan_input)
+        # reg_out = regressor_model(gan_input)
+        gan_output = discriminator_model(reg_out)
+        gan_model = Model(gan_input, outputs=gan_output)
         gan_model.compile(loss=keras.losses.binary_crossentropy,
                           optimizer=self._get_optimizer())
-
+        ''''''
         gan_model.summary()
         '''save GAN Model'''
-        # gan_model.save_weights('gw.h5')
-        # plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
+        # gan_model.save_model('gw.h5')
+        plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
 
         # xx = tf.keras.models.load_model(gan_model, 'gan_model.h5')
         # tf.keras.models.save_model(gan_model, 'gan_model.h5')
-        # model_json = gan_model.to_json()
-        # with open("gan_model.json", "w") as json_file:
-        #     json_file.write(model_json)
+        model_json = gan_model.to_json()
+        with open("gan_model.json", "w") as json_file:
+            json_file.write(model_json)
 
         '''Save both model metrics in  a CSV file'''
         log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
@@ -121,22 +121,18 @@ class FacialGAN:
         for epoch in range(LearningConfig.epochs):
             loss = []
             for batch_index in range(step_per_epoch):
-                # try:
-                images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                try:
+                    images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                    heatmaps_pr, points_pr = regressor_model.predict_on_batch(images)
+                    disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr, points_pr, images)
+                    d_loss = discriminator_model.train_on_batch(disc_x, disc_y)
+                    y_gen = np.ones(LearningConfig.batch_size)
+                    g_loss = gan_model.train_on_batch(images, y_gen)
 
-                heatmaps_pr, points_pr = regressor_model.predict_on_batch(images)
-
-                disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr, points_pr, images)
-
-                d_loss = discriminator_model.train_on_batch(disc_x, disc_y)
-
-                y_gen = np.ones(LearningConfig.batch_size)
-                g_loss = gan_model.train_on_batch(images, y_gen)
-
-                print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
-                      f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
-                # except Exception as e:
-                #     print('Faced Exception in train: ' + str(e))
+                    print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
+                          f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
+                except Exception as e:
+                    print('Faced Exception in train: ' + str(e))
 
             loss.append(epoch)
             self._write_loss_log(log_file_name, loss)
@@ -191,7 +187,6 @@ class FacialGAN:
         :param img:
         :return:
         """
-
         '''resize img to hm_size:'''
         # img = tf.image.resize(img, [InputDataSize.hm_size, InputDataSize.hm_size]) --> the result will be a tensor
         img = resize(img, (LearningConfig.batch_size, InputDataSize.hm_size, InputDataSize.hm_size, 3))
@@ -211,12 +206,15 @@ class FacialGAN:
         # imgpr.print_image_arr_heat(201, heatmaps_pr[1], print_single=False)
 
         '''concat hm, 2d_points, img '''
-        real_X = np.concatenate([heatmaps_gr, fg_gt, img], axis=-1)
-        fake_X = np.concatenate([heatmaps_pr, fg_pr, img], axis=-1)
+        # real_X = np.concatenate([heatmaps_gr, fg_gt, img], axis=-1)
+        # fake_X = np.concatenate([heatmaps_pr, fg_pr, img], axis=-1)
+        '''     in case we needed without img'''
+        real_X = np.concatenate([heatmaps_gr, fg_gt], axis=-1)
+        fake_X = np.concatenate([heatmaps_pr, fg_pr], axis=-1)
         '''create real/fake labels and attach to the input data'''
-        X = np.concatenate([fake_X, real_X], axis=0)
+        X = np.concatenate((fake_X, real_X), axis=0)
         Y = np.zeros(2 * LearningConfig.batch_size)
-        Y[:LearningConfig.batch_size] = 1
+        Y[:LearningConfig.batch_size] = 0.9 # use smooth labels
 
         return X, Y
 
@@ -268,13 +266,19 @@ class FacialGAN:
         :param regressor_output:[ [?, ?, ?, 8], [?, 136] ]
         :return: [bs, 56, 56, num_fg*2] ==> hm, points
         """
+        return keras.layers.Concatenate()([regressor_output[0], regressor_output[0]])
+        # return keras.layers.Concatenate()([regressor_output, regressor_output])
+
+        # con_1 = keras.layers.Concatenate()([regressor_output, regressor_output])
+        # return Lambda(lambda x: keras.layers.Concatenate()([con_1, x]))(t_inp_img)
+
+
         t_hm = regressor_output[0]
         t_hm_cp = regressor_output[0]
         t_pn = regressor_output[1]
 
         t_inp_img = tf.image.resize(regressor_input, [InputDataSize.hm_size, InputDataSize.hm_size])
         t_hm = keras.layers.Concatenate()([t_hm, t_inp_img])
-        # t_hm = tf.concat([t_hm, t_inp_img], axis=-1)
 
         t_pn_img = Lambda(lambda x: self._convert_to_geometric(t_hm_cp, tf.cast(x, 'int64')))(t_pn)
         t_fused = Lambda(lambda x: self._fuse_tensors(t_hm, x))(t_pn_img)

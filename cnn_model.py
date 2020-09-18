@@ -158,6 +158,7 @@ class CNNModel:
         out_geo = Dense(num_landmark, name='O_geo')(x)
         #
         eff_net = Model(inp, [out_heatmap, out_geo])
+        # eff_net = Model(inp, [out_heatmap])
 
         eff_net.summary()
 
