@@ -45,11 +45,21 @@ class CNNModel:
             model = self.create_effGlassNet(input_shape=input_shape, input_tensor=input_tensor,
                                             num_landmark=num_landmark, num_face_graph_elements=num_face_graph_elements)
         elif arch == 'effDiscrimNet':
+            # model = self.create_resnetDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
             model = self.create_effDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
 
         else:
             model = self.create_effNet(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
         return model
+
+    def create_resnetDiscrimNet(self, input_shape, input_tensor):
+        eff_net = keras.applications.resnet.ResNet50(include_top=True, weights=None, input_tensor=input_tensor,
+                                                     input_shape=input_shape, pooling=None, classes=1)
+        eff_net.summary()
+        model_json = eff_net.to_json()
+        with open("effDiscrimNet.json", "w") as json_file:
+            json_file.write(model_json)
+        return eff_net
 
     def create_effDiscrimNet(self, input_shape, input_tensor):
         """

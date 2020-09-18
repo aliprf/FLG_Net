@@ -23,6 +23,8 @@ from keras.utils.vis_utils import plot_model
 import itertools
 from skimage.transform import resize
 from image_utility import ImageUtility
+import img_printer as imgpr
+
 
 tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -120,16 +122,16 @@ class FacialGAN:
             loss = []
             for batch_index in range(step_per_epoch):
                 # try:
-                images, heatmaps, points = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
 
-                predicted_heatmaps, predicted_points = regressor_model.predict_on_batch(images)
+                heatmaps_pr, points_pr = regressor_model.predict_on_batch(images)
 
-                disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps, predicted_heatmaps, points,
-                                                                         predicted_points, images)
+                disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr, points_pr, images)
 
-                d_loss = regressor_model.train_on_batch(disc_x, disc_y)
+                d_loss = discriminator_model.train_on_batch(disc_x, disc_y)
 
-                g_loss = gan_model.train_on_batch(imgs, y_gen)
+                y_gen = np.ones(LearningConfig.batch_size)
+                g_loss = gan_model.train_on_batch(images, y_gen)
 
                 print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
                       f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
@@ -181,7 +183,7 @@ class FacialGAN:
 
     def _prepare_discriminator_model_input(self, heatmaps_gr, heatmaps_pr, points_gr, points_pr, img):
         """
-        at the first step, we fuse concate heatmaps + 2d_points.Then create real/fake labels
+        at the first step, we fuse concat heatmaps + 2d_points.Then create real/fake labels
         :param heatmaps_gr:
         :param heatmaps_pr:
         :param points_gr:
@@ -196,10 +198,27 @@ class FacialGAN:
         '''convert points to 2d facial graph:'''
         fg_gt = self._points_to_2d_face_graph(points_gr)
         fg_pr = self._points_to_2d_face_graph(points_pr)
-        '''concat hm, 2d_points, img '''
-        '''create real/fake labels and attach to the input data'''
 
-        return 0, 0
+        '''for testing :'''
+        # imgpr.print_image_arr_heat(100, fg_gt[0], print_single=False)
+        # imgpr.print_image_arr_heat(101, heatmaps_gr[0], print_single=False)
+        # imgpr.print_image_arr_heat(200, fg_gt[1], print_single=False)
+        # imgpr.print_image_arr_heat(201, heatmaps_gr[1], print_single=False)
+        #
+        # imgpr.print_image_arr_heat(100, fg_pr[0], print_single=False)
+        # imgpr.print_image_arr_heat(101, heatmaps_pr[0], print_single=False)
+        # imgpr.print_image_arr_heat(200, fg_pr[1], print_single=False)
+        # imgpr.print_image_arr_heat(201, heatmaps_pr[1], print_single=False)
+
+        '''concat hm, 2d_points, img '''
+        real_X = np.concatenate([heatmaps_gr, fg_gt, img], axis=-1)
+        fake_X = np.concatenate([heatmaps_pr, fg_pr, img], axis=-1)
+        '''create real/fake labels and attach to the input data'''
+        X = np.concatenate([fake_X, real_X], axis=0)
+        Y = np.zeros(2 * LearningConfig.batch_size)
+        Y[:LearningConfig.batch_size] = 1
+
+        return X, Y
 
     def _points_to_2d_face_graph(self, _points):
         """
@@ -211,15 +230,17 @@ class FacialGAN:
         image_utility = ImageUtility()
         indx = 0
         for item in _points:
-            point_scaled, _, _ = image_utility.create_landmarks_from_normalized(item, InputDataSize.image_input_size,
-                                                                                InputDataSize.image_input_size,
-                                                                                InputDataSize.img_center,
-                                                                                InputDataSize.img_center)
+            point_scaled, px_1, py_1 = image_utility.create_landmarks_from_normalized(item, InputDataSize.hm_size,
+                                                                                InputDataSize.hm_size,
+                                                                                InputDataSize.hm_center,
+                                                                                InputDataSize.hm_center)
+            # imgpr.print_image_arr('pts_' + str(indx), np.zeros([56,56]), px_1, py_1)
+
             points[indx, :] = point_scaled
             indx += 1
 
         '''create partial parts: '''
-        partial_points = self._slice_face_graph(points)
+        partial_points = self._slice_face_graph_np(points)
         '''convert from flatten to 2d'''
         points_2d = []
         for pnt in partial_points:
@@ -231,9 +252,13 @@ class FacialGAN:
             for j in range(self.num_face_graph_elements):
                 t_hm = np.zeros([InputDataSize.hm_size, InputDataSize.hm_size])
                 for x_y in points_2d[j][i]:
-                    t_hm[int(x_y[0]), int(x_y[1])] = 1
-                hm_img[i, :, :, j] = t_hm
+                    if not(0 <= x_y[0] <= InputDataSize.hm_size-1):
+                        x_y[0] = 0
+                    if not(0 <= x_y[1] <= InputDataSize.hm_size-1):
+                        x_y[1] = 0
+                    t_hm[int(x_y[1]), int(x_y[0])] = 1
 
+                hm_img[i, :, :, j] = t_hm
 
         return hm_img
 
@@ -259,8 +284,6 @@ class FacialGAN:
 
         # t_hm_shape = t_hm.get_shape().as_list()
 
-        # t_hm = tf.reshape(tensor=t_hm, shape=[tf.shape(t_hm)[0], tf.shape(t_hm)[1], tf.shape(t_hm)[2], tf.shape(t_hm)[3]])
-
         t_pn_img = tf.reshape(tensor=t_pn_img, shape=[tf.shape(t_hm)[0], InputDataSize.hm_size, InputDataSize.hm_size,
                                                       self.num_face_graph_elements])
         t_fused = keras.layers.Concatenate()([t_hm, t_pn_img])
@@ -281,7 +304,7 @@ class FacialGAN:
         hm_img = tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
 
         '''convert two_d_coords to facial part:'''
-        sep_1_d_cord = self._slice_face_graph(coordinates)
+        sep_1_d_cord = self._slice_face_graph_tensor(coordinates)
 
         '''convert all points to 2d:'''
         counter = 0
@@ -309,21 +332,51 @@ class FacialGAN:
             for x_indx in range(two_d_coords.shape[1]):  # cordinates
                 x = two_d_coords[batch_indx, x_indx][0]
                 y = two_d_coords[batch_indx, x_indx][1]
-                item = [batch_indx, x, y, counter]
+                item = [batch_indx, y, x, counter] # the coordination should be y,x NOT x,y
+                # item = [batch_indx, x, y, counter]
                 indices.append(item)
         return indices
 
-    def _slice_face_graph(self, coordinates):
-        # two_d_coords = tf.reshape(tensor=coordinates, shape=[-1, self.num_landmark//2, 2])
-        #  two_d_coords: ? * 136
+    def _slice_face_graph_tensor(self, coordinates):
         if self.dataset_name == DatasetName.wflw:
             return 0
         elif self.dataset_name == DatasetName.cofw:
             return 0
         elif self.dataset_name == DatasetName.ibug:
-            sep_1_d_cord = [coordinates[:, 0:34], coordinates[:, 34:44], coordinates[:, 44:54], coordinates[:, 54:62],
-                            coordinates[:, 60:72], coordinates[:, 54:72], coordinates[:, 72:84], coordinates[:, 84:96],
-                            coordinates[:, 96:136]]
+
+            sep_1_d_cord = [coordinates[:, 0:34],  # face
+                            coordinates[:, 34:44],  # li
+                            coordinates[:, 44:54],  # ri
+                            coordinates[:, 54:62],  # nose_b
+                            coordinates[:, 62:72],  # nose
+                            coordinates[:, 72:84],  # leye
+                            coordinates[:, 84:96],  # reye
+                            tf.concat([coordinates[:, 96:110], coordinates[:, 128:130], coordinates[:, 126:128],
+                                       coordinates[:, 124:126], coordinates[:, 122:124], coordinates[:, 120:122]],
+                                      axis=-1),  # u_lip
+                            tf.concat([coordinates[:, 110:120], coordinates[:, 134:136], coordinates[:, 132:134],
+                                       coordinates[:, 130:132]], axis=-1)]  # l_lip
+        return sep_1_d_cord
+
+    def _slice_face_graph_np(self, coordinates):
+        if self.dataset_name == DatasetName.wflw:
+            return 0
+        elif self.dataset_name == DatasetName.cofw:
+            return 0
+        elif self.dataset_name == DatasetName.ibug:
+
+            sep_1_d_cord = [coordinates[:, 0:34],  # face
+                            coordinates[:, 34:44],  # li
+                            coordinates[:, 44:54],  # ri
+                            coordinates[:, 54:62],  # nose_b
+                            coordinates[:, 62:72],  # nose
+                            coordinates[:, 72:84],  # leye
+                            coordinates[:, 84:96],  # reye
+                            np.concatenate([coordinates[:, 96:110], coordinates[:, 128:130], coordinates[:, 126:128],
+                                            coordinates[:, 124:126], coordinates[:, 122:124], coordinates[:, 120:122]],
+                                           axis=-1),  # u_lip
+                            np.concatenate([coordinates[:, 110:120], coordinates[:, 134:136], coordinates[:, 132:134],
+                                            coordinates[:, 130:132]], axis=-1)]  # l_lip
         return sep_1_d_cord
 
     def _get_optimizer(self, lr=1e-2, beta_1=0.9, beta_2=0.999, decay=1e-5):
@@ -342,6 +395,16 @@ class FacialGAN:
         img_batch = np.array([imread(img_path + file_name) for file_name in batch_x])
         hm_batch = np.array([load(hm_tr_path + file_name) for file_name in batch_y])
         pn_batch = np.array([load(pn_tr_path + file_name) for file_name in batch_y])
+        '''test:'''
+
+        # imgpr.print_image_arr_heat('h_0', hm_batch[0])
+        # imgpr.print_image_arr_heat('h_1', hm_batch[1])
+        # image_utility = ImageUtility()
+        # point_scaled, px_1, Py_1 = image_utility.create_landmarks_from_normalized(pn_batch[0], 224, 224, 112, 112)
+        # point_scaled, px_2, Py_2 = image_utility.create_landmarks_from_normalized(pn_batch[1], 224, 224, 112, 112)
+        # imgpr.print_image_arr('pts_0', img_batch[0], px_1, Py_1)
+        # imgpr.print_image_arr('pts_1', img_batch[1], px_2, Py_2)
+
         return img_batch, hm_batch, pn_batch
 
     def _create_generators(self):
