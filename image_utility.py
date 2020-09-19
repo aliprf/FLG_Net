@@ -79,14 +79,16 @@ class ImageUtility:
                                                                   scale_factor_x=1, scale_factor_y=1)
             # self.print_image_arr(str(xy_points[8]), _image, x_points, y_points)
 
-            _image, _label = self.cropImg_2time(_image, x_points, y_points)
+            # _image, _label = self.cropImg_2time(_image, x_points, y_points)
 
-            _image = self.__noisy(_image)
+            _image = self._noisy(_image)
 
-            scale = (np.random.uniform(0.8, 1.0), np.random.uniform(0.8, 1.0))
-            # scale = (1, 1)
+            if random.randint(0, 4) <= 1:
+                _image = self._change_color(_image)
 
-            rot = np.random.uniform(-1 * 0.55, 0.55)
+            scale = (np.random.uniform(0.75, 1.0), np.random.uniform(0.75, 1.0))
+
+            rot = np.random.uniform(-1 * 0.80, 0.80)
             translation = (0, 0)
             shear = 0
 
@@ -113,14 +115,13 @@ class ImageUtility:
             label_t = np.dot(t_matrix, label)
             lbl_flat = np.delete(label_t, 2, axis=0).reshape([2*num_of_landmarks])
 
-            t_label = self.__reorder(lbl_flat, num_of_landmarks)
+            t_label = self._reorder(lbl_flat, num_of_landmarks)
 
             '''crop data: we add a small margin to the images'''
             xy_points, x_points, y_points = self.create_landmarks(landmarks=t_label,
                                                                   scale_factor_x=1, scale_factor_y=1)
             img_arr, points_arr = self.cropImg(output_img, x_points, y_points, no_padding=False)
-            # img_arr = output_img
-            # points_arr = t_label
+
             '''resize image to InputDataSize.image_input_size*InputDataSize.image_input_size'''
             resized_img = resize(img_arr,
                                  (InputDataSize.image_input_size, InputDataSize.image_input_size, 3),
@@ -190,11 +191,11 @@ class ImageUtility:
         im_lbl_ar = np.array(im_lbl)
         im_lbl_m_ar = np.array(im_lbl_m)
 
-        self.__save_label(im_lbl_ar, file_name, np.array(im))
-        self.__save_label(im_lbl_m_ar, file_name+"_m", np.array(im_m))
+        self._save_label(im_lbl_ar, file_name, np.array(im))
+        self._save_label(im_lbl_m_ar, file_name+"_m", np.array(im_m))
 
 
-    def __save_label(self, im_lbl_ar, file_name, img_arr):
+    def _save_label(self, im_lbl_ar, file_name, img_arr):
 
         im_lbl_point = []
         for i in range(im_lbl_ar.shape[0]):
@@ -253,7 +254,7 @@ class ImageUtility:
         #
         # sat_img = K.eval(sat_img)
         #
-        _image = self.__noisy(_image)
+        _image = self._noisy(_image)
 
         shear = 0
 
@@ -284,10 +285,10 @@ class ImageUtility:
         label_t = np.dot(t_matrix, label)
         lbl_flat = np.delete(label_t, 2, axis=0).reshape([num_of_landmarks*2])
 
-        t_label = self.__reorder(lbl_flat, num_of_landmarks)
+        t_label = self._reorder(lbl_flat, num_of_landmarks)
         return t_label, output_img
 
-    def __noisy(self, image):
+    def _noisy(self, image):
         noise_typ = random.randint(0, 5)
         if noise_typ == 0:
             s_vs_p = 0.1
@@ -332,7 +333,7 @@ class ImageUtility:
         else:
             return image
 
-    def __reorder(self, input_arr, num_of_landmarks):
+    def _reorder(self, input_arr, num_of_landmarks):
         out_arr = []
         for i in range(num_of_landmarks):
             out_arr.append(input_arr[i])
@@ -440,37 +441,36 @@ class ImageUtility:
     def random_augmentation(self, lbl, img, number_of_landmark):
         # a = random.randint(0, 2)
         # if a == 0:
-        #     img, lbl = self.__add_margin(img, img.shape[0], lbl)
+        #     img, lbl = self._add_margin(img, img.shape[0], lbl)
 
         '''this function has problem!!!'''
-        # img, lbl = self.__add_margin(img, img.shape[0], lbl)
+        # img, lbl = self._add_margin(img, img.shape[0], lbl)
 
         # else:
-        #     img, lbl = self.__negative_crop(img, lbl)
+        #     img, lbl = self._negative_crop(img, lbl)
 
         # i = random.randint(0, 2)
         # if i == 0:
-        #     img, lbl = self.__rotate(img, lbl, 90, img.shape[0], img.shape[1])
+        #     img, lbl = self._rotate(img, lbl, 90, img.shape[0], img.shape[1])
         # elif i == 1:
-        #     img, lbl = self.__rotate(img, lbl, 180, img.shape[0], img.shape[1])
+        #     img, lbl = self._rotate(img, lbl, 180, img.shape[0], img.shape[1])
         # else:
-        #     img, lbl = self.__rotate(img, lbl, 270, img.shape[0], img.shape[1])
+        #     img, lbl = self._rotate(img, lbl, 270, img.shape[0], img.shape[1])
 
         # k = random.randint(0, 3)
         # if k > 0:
-        #     img = self.__change_color(img)
+        #     img = self._change_color(img)
         #
-        img = self.__noisy(img)
+        img = self._noisy(img)
 
         lbl = np.reshape(lbl, [number_of_landmark*2])
         return lbl, img
 
-
     def cropImg_2time(self, img, x_s, y_s):
-        min_x = max(0, int(min(x_s) - 100))
-        max_x = int(max(x_s) + 100)
-        min_y = max(0, int(min(y_s) - 100))
-        max_y = int(max(y_s) + 100)
+        min_x = max(0, int(min(x_s) - 150))
+        max_x = int(max(x_s) + 150)
+        min_y = max(0, int(min(y_s) - 150))
+        max_y = int(max(y_s) + 150)
 
         crop = img[min_y:max_y, min_x:max_x]
 
@@ -519,7 +519,7 @@ class ImageUtility:
 
         return crop, new_xy_s
 
-    def __negative_crop(self, img, landmarks):
+    def _negative_crop(self, img, landmarks):
 
         landmark_arr_xy, x_s, y_s = self.create_landmarks(landmarks, 1, 1)
         min_x = img.shape[0] // random.randint(5, 15)
@@ -544,7 +544,7 @@ class ImageUtility:
 
         return crop, new_xy_s
 
-    def __add_margin(self, img, img_w, lbl):
+    def _add_margin(self, img, img_w, lbl):
         marging_width = img_w // random.randint(15, 20)
         direction = random.randint(0, 4)
 
@@ -563,23 +563,23 @@ class ImageUtility:
         if direction == 3:  # need chane labels
             margings_1 = np.random.random([img_w, int(marging_width), 3])
             img = np.concatenate((margings_1, img), axis=1)
-            lbl = self.__transfer_lbl(int(marging_width), lbl, [1, 0])
+            lbl = self._transfer_lbl(int(marging_width), lbl, [1, 0])
 
             marging_width_1 = img_w // random.randint(15, 20)
             margings_2 = np.random.random([int(marging_width_1), img_w + int(marging_width), 3])
             img = np.concatenate((margings_2, img), axis=0)
-            lbl = self.__transfer_lbl(int(marging_width_1), lbl, [0, 1])
+            lbl = self._transfer_lbl(int(marging_width_1), lbl, [0, 1])
 
         if direction == 4:  # need chane labels
             margings_1 = np.random.random([img_w, int(marging_width), 3])
             img = np.concatenate((margings_1, img), axis=1)
-            lbl = self.__transfer_lbl(int(marging_width), lbl, [1, 0])
+            lbl = self._transfer_lbl(int(marging_width), lbl, [1, 0])
             img_w1 = img_w + int(marging_width)
 
             marging_width_1 = img_w // random.randint(15, 20)
             margings_2 = np.random.random([int(marging_width_1), img_w1, 3])
             img = np.concatenate((margings_2, img), axis=0)
-            lbl = self.__transfer_lbl(int(marging_width_1), lbl, [0, 1])
+            lbl = self._transfer_lbl(int(marging_width_1), lbl, [0, 1])
             img_w2 = img_w + int(marging_width_1)
 
             marging_width_1 = img_w // random.randint(15, 20)
@@ -592,7 +592,7 @@ class ImageUtility:
 
         return img, lbl
 
-    def __void_image(self, img, img_w, ):
+    def _void_image(self, img, img_w, ):
         marging_width = int(img_w / random.randint(7, 16))
         direction = random.randint(0, 1)
         direction = 0
@@ -606,31 +606,21 @@ class ImageUtility:
 
         return img
 
-    def __change_color(self, img):
-        # color_arr = np.random.random([img.shape[0], img.shape[1]])
-        color_arr = np.zeros([img.shape[0], img.shape[1]])
-        axis = random.randint(0, 4)
+    def _change_color(self, src):
+        which = random.randint(0, 2)
+        axis = random.randint(0, 2)
+        if which == 0:
+            src[:, :, axis] = np.zeros([src.shape[0], src.shape[1]])
+        elif which == 1:
+            tmp_im = np.zeros(src.shape, dtype="uint8")
+            tmp_im[:, :, axis] = src[:, :, axis]
+            src = tmp_im
+        else:
+            axis = random.randint(0, 2)
+            src[:, :, axis] = np.random.randint(0, 20, [src.shape[0], src.shape[1]])
+        return src
 
-        if axis == 0:  # red
-            img_mono = img[:, :, 0]
-            new_img = np.stack([img_mono, color_arr, color_arr], axis=2)
-        elif axis == 1:  # green
-            img_mono = img[:, :, 1]
-            new_img = np.stack([color_arr, img_mono, color_arr], axis=2)
-        elif axis == 2:  # blue
-            img_mono = img[:, :, 1]
-            new_img = np.stack([color_arr, img_mono, color_arr], axis=2)
-        elif axis == 3:  # gray scale
-            img_mono = img[:, :, 0]
-            new_img = np.stack([img_mono, img_mono, img_mono], axis=2)
-        else:  # random noise
-            color_arr = np.random.random([img.shape[0], img.shape[1]])
-            img_mono = img[:, :, 0]
-            new_img = np.stack([img_mono, img_mono, color_arr], axis=2)
-
-        return new_img
-
-    def __rotate_origin_only(self, xy_arr, radians, xs, ys):
+    def _rotate_origin_only(self, xy_arr, radians, xs, ys):
         """Only rotate a point around the origin (0, 0)."""
         rotated = []
         for xy in xy_arr:
@@ -640,22 +630,22 @@ class ImageUtility:
             rotated.append([xx + xs, yy + ys])
         return np.array(rotated)
 
-    def __rotate(self, img, landmark_old, degree, img_w, img_h, num_of_landmarks):
+    def _rotate(self, img, landmark_old, degree, img_w, img_h, num_of_landmarks):
         landmark_old = np.reshape(landmark_old, [num_of_landmarks, 2])
 
         theta = math.radians(degree)
 
         if degree == 90:
-            landmark = self.__rotate_origin_only(landmark_old, theta, 0, img_h)
+            landmark = self._rotate_origin_only(landmark_old, theta, 0, img_h)
             return np.rot90(img, 3, axes=(-2, 0)), landmark
         elif degree == 180:
-            landmark = self.__rotate_origin_only(landmark_old, theta, img_h, img_w)
+            landmark = self._rotate_origin_only(landmark_old, theta, img_h, img_w)
             return np.rot90(img, 2, axes=(-2, 0)), landmark
         elif degree == 270:
-            landmark = self.__rotate_origin_only(landmark_old, theta, img_w, 0)
+            landmark = self._rotate_origin_only(landmark_old, theta, img_w, 0)
             return np.rot90(img, 1, axes=(-2, 0)), landmark
 
-    def __transfer_lbl(self, marging_width_1, lbl, axis_arr):
+    def _transfer_lbl(self, marging_width_1, lbl, axis_arr):
         new_lbl = []
         for i in range(0, len(lbl), 2):
             new_lbl.append(lbl[i] + marging_width_1 * axis_arr[0])
