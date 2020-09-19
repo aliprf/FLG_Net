@@ -72,9 +72,9 @@ if __name__ == '__main__':
 
 
     '''--> Train Model'''
-    fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
-                   discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
-                   input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                   input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size,
-                                     IbugConf.num_face_graph_elements * 2])
-    fg.train_network()
+    # fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
+    #                discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
+    #                input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #                input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size,
+    #                                  IbugConf.num_face_graph_elements * 2])
+    # fg.train_network()
