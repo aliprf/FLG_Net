@@ -87,7 +87,7 @@ class FacialGAN:
         # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
         # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
 
-        regressor_model.trainable = False
+        regressor_model.trainable = True
         discriminator_model.trainable = True
 
         gan_input = Input(shape=self.input_shape_reg)

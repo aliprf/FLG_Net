@@ -33,13 +33,14 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
-    tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
-    # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
-    '''     normalize the points and save'''
-    tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
-    # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
-    tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
+    # tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
+    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
+    # # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
+    # '''     normalize the points and save'''
+    # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
+    # # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
+    # tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
+
 
     '''--> retrive and test tfRecords'''
     # tf_record_util = TFRecordUtility(WflwConf.num_of_landmarks*2)
@@ -72,9 +73,9 @@ if __name__ == '__main__':
 
 
     '''--> Train Model'''
-    # fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
-    #                discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
-    #                input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-    #                input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size,
-    #                                  IbugConf.num_face_graph_elements * 2])
-    # fg.train_network()
+    fg = FacialGAN(dataset_name=DatasetName.ibug, geo_custom_loss=False, regressor_arch='effGlassNet',
+                   discriminator_arch='effDiscrimNet', regressor_weight=None, discriminator_weight=None,
+                   input_shape_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+                   input_shape_disc=[InputDataSize.hm_size, InputDataSize.hm_size,
+                                     IbugConf.num_face_graph_elements * 2])
+    fg.train_network()
