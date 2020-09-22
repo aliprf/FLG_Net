@@ -1864,19 +1864,19 @@ class TFRecordUtility:
             img_dir = IbugConf.train_images_dir
             landmarks_dir = IbugConf.normalized_points_npy_dir
             hm_dir = IbugConf.train_hm_dir
-            stride = 2
+            stride = IbugConf.hm_stride
 
         elif dataset_name == DatasetName.wflw:
             img_dir = WflwConf.train_images_dir
             landmarks_dir = WflwConf.normalized_points_npy_dir
             hm_dir = WflwConf.train_hm_dir
-            stride = 2
+            stride = WflwConf.hm_stride
 
         elif dataset_name == DatasetName.cofw:
             img_dir = CofwConf.train_images_dir
             landmarks_dir = CofwConf.normalized_points_npy_dir
             hm_dir = CofwConf.train_hm_dir
-            stride = 2
+            stride = CofwConf.hm_stride
 
         counter = 0
         for file in tqdm(os.listdir(img_dir)):

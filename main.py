@@ -20,7 +20,7 @@ if __name__ == '__main__':
     cnn_model = CNNModel()
     image_utility = ImageUtility()
 
-    # tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
+
 
     # tf_record_util.test_hm_accuracy()
     # tf_record_util.create_adv_att_img_hm()
@@ -35,13 +35,13 @@ if __name__ == '__main__':
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
     tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
-    # # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
+    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
     # # # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
     # # '''     normalize the points and save'''
     # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
     # # # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
     # tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
-    tf_record_util.create_all_heatmap(dataset_name=DatasetName.ibug, dataset_type=None)
+    # tf_record_util.create_all_heatmap(dataset_name=DatasetName.ibug, dataset_type=None)
 
 
     '''--> retrive and test tfRecords'''
@@ -80,6 +80,7 @@ if __name__ == '__main__':
                          hm_discriminator_weight=None, cord_discriminator_weight=None,
                          input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
                          input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                         input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 5],  # we suppose to fuse data[ hm1, p_hm1, img3]
-                         input_shape_cord_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 5])
+                         input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],  # we suppose to fuse data[ hm1, p_hm1, img3]
+                         # input_shape_cord_disc=[IbugConf.num_of_landmarks, 2])
+                         input_shape_cord_disc=[56, 56, 2]) # the input is not correct here
     fg.train_network()

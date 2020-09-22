@@ -126,12 +126,12 @@ class CNNModel:
         x = keras.layers.add([x, bn_0])  # 56, 56, 256
 
         '''out heatmap regression'''
-        out_heatmap = Conv2D(num_landmark, kernel_size=1, padding='same', name='O_hm')(x)
+        out_heatmap = Conv2D(num_landmark//2, kernel_size=1, padding='same', name='O_hm')(x)
         eff_net = Model(inp, [out_heatmap])
         eff_net.summary()
 
         model_json = eff_net.to_json()
-        with open("hm_reg_model.json", "w") as json_file:
+        with open("./model_arch/hm_reg_model.json", "w") as json_file:
             json_file.write(model_json)
         return eff_net
 
@@ -164,7 +164,7 @@ class CNNModel:
         eff_net.summary()
 
         model_json = eff_net.to_json()
-        with open("cord_reg_model.json", "w") as json_file:
+        with open("./model_arch/cord_reg_model.json", "w") as json_file:
             json_file.write(model_json)
         return eff_net
 
@@ -203,7 +203,7 @@ class CNNModel:
                                      classes=num_landmark)
 
         model_json = eff_net.to_json()
-        with open("effNet-b7_main.json", "w") as json_file:
+        with open("./model_arch/effNet-b7_main.json", "w") as json_file:
             json_file.write(model_json)
         return eff_net
 

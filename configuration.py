@@ -32,7 +32,7 @@ class LearningConfig:
     MIN_LR = 1e-7
     MAX_LR = 1e-2
     STEP_SIZE = 10
-    batch_size = 2
+    batch_size = 3
     steps_per_validation_epochs = 5
     epochs = 200
 
@@ -141,6 +141,8 @@ class WflwConf:
     augmentation_factor_rotate = 15  # create . image from 15
     num_of_landmarks = 98
     num_face_graph_elements = 8
+    hm_stride = 2
+
 
 class CofwConf:
     # Cofw_prefix_path = '/media/data3/ali/FL/cofw/'  # --> Zeus
@@ -177,14 +179,14 @@ class CofwConf:
     augmentation_factor_rotate = 30  # create . image from 1
     num_of_landmarks = 28
     num_face_graph_elements = 8
-
+    hm_stride = 3
 
 class IbugConf:
     '''server_config'''
     # _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
     # _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
-    _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
-    # _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
+    # _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
+    _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
 
     img_path_prefix = _Ibug_prefix_path + 'all/'
     rotated_img_path_prefix = _Ibug_prefix_path + '1_train_images_pts_dir/'
@@ -217,4 +219,5 @@ class IbugConf:
     augmentation_factor_rotate = 20  # create . image from 1
     num_of_landmarks = 68
     num_face_graph_elements = 9
+    hm_stride = 2
 
