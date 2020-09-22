@@ -32,7 +32,7 @@ class LearningConfig:
     MIN_LR = 1e-7
     MAX_LR = 1e-2
     STEP_SIZE = 10
-    batch_size = 60
+    batch_size = 2
     steps_per_validation_epochs = 5
     epochs = 200
 
@@ -102,13 +102,12 @@ class WflwConf:
     train_images_dir = Wflw_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = Wflw_prefix_path + '2_normalized_npy_dir/'
     graph_face_dir = Wflw_prefix_path + '3_graph_face/'
-    pose_npy_dir = Wflw_prefix_path + '4_pose_npy_dir/'
+    train_hm_dir = Wflw_prefix_path + '4_train_hm_dir/'
 
     test_img_path_prefix = Wflw_prefix_path + 'test_all/'
     test_images_dir = Wflw_prefix_path + 'test_images_pts_dir/'
     test_normalized_points_npy_dir = Wflw_prefix_path + 'test_normalized_npy_dir/'
     test_pose_npy_dir = Wflw_prefix_path + 'test_pose_npy_dir/'
-    train_hm_dir = Wflw_prefix_path + 'train_hm_dir/'
 
     tf_train_path = Wflw_prefix_path + 'train.tfrecords'
     tf_evaluation_path = Wflw_prefix_path + 'evaluation.tfrecords'
@@ -154,7 +153,7 @@ class CofwConf:
     train_images_dir = Cofw_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = Cofw_prefix_path + '2_normalized_npy_dir/'
     graph_face_dir = Cofw_prefix_path + '3_graph_face/'
-    pose_npy_dir = Cofw_prefix_path + '4_pose_npy_dir/'
+    train_hm_dir = Cofw_prefix_path + '4_train_hm_dir/'
 
     test_img_path_prefix = Cofw_prefix_path + 'test_all/'
     test_images_dir = Cofw_prefix_path + 'test_images_pts_dir/'
@@ -164,8 +163,6 @@ class CofwConf:
     tf_train_path = Cofw_prefix_path + 'train.tfrecords'
     tf_test_path = Cofw_prefix_path + 'test.tfrecords'
     tf_evaluation_path = Cofw_prefix_path + 'evaluation.tfrecords'
-    train_hm_dir = Cofw_prefix_path + 'train_hm_dir/'
-
     tf_train_path_95 = Cofw_prefix_path + 'train_95.tfrecords'
     tf_evaluation_path_95 = Cofw_prefix_path + 'evaluation_95.tfrecords'
 
@@ -184,9 +181,9 @@ class CofwConf:
 
 class IbugConf:
     '''server_config'''
-    _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
+    # _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
     # _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
-    # _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
+    _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
     # _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
 
     img_path_prefix = _Ibug_prefix_path + 'all/'
@@ -194,7 +191,7 @@ class IbugConf:
     train_images_dir = _Ibug_prefix_path + '1_train_images_pts_dir/'
     normalized_points_npy_dir = _Ibug_prefix_path + '2_normalized_npy_dir/'
     graph_face_dir = _Ibug_prefix_path + '3_graph_face/'
-    pose_npy_dir = _Ibug_prefix_path + '4_pose_npy_dir/'
+    train_hm_dir = _Ibug_prefix_path + '4_train_hm_dir/'
 
     tf_test_path_full = _Ibug_prefix_path + 'test_full.tfrecords'
     tf_test_path_common = _Ibug_prefix_path + 'test_common.tfrecords'
@@ -205,7 +202,6 @@ class IbugConf:
     test_normalized_points_npy_dir = _Ibug_prefix_path + 'test_normalized_npy_dir/'
     test_pose_npy_dir = _Ibug_prefix_path + 'test_pose_npy_dir/'
 
-    train_hm_dir = _Ibug_prefix_path + 'train_hm_dir/'
 
     orig_number_of_training = 3148
     orig_number_of_test_full = 689

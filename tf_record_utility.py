@@ -1857,6 +1857,53 @@ class TFRecordUtility:
         if tf_evaluation_path is not None:
             writer_evaluate.close()
 
+    def create_all_heatmap(self, dataset_name, dataset_type):
+        image_utility = ImageUtility()
+
+        if dataset_name == DatasetName.ibug:
+            img_dir = IbugConf.train_images_dir
+            landmarks_dir = IbugConf.normalized_points_npy_dir
+            hm_dir = IbugConf.train_hm_dir
+            stride = 2
+
+        elif dataset_name == DatasetName.wflw:
+            img_dir = WflwConf.train_images_dir
+            landmarks_dir = WflwConf.normalized_points_npy_dir
+            hm_dir = WflwConf.train_hm_dir
+            stride = 2
+
+        elif dataset_name == DatasetName.cofw:
+            img_dir = CofwConf.train_images_dir
+            landmarks_dir = CofwConf.normalized_points_npy_dir
+            hm_dir = CofwConf.train_hm_dir
+            stride = 2
+
+        counter = 0
+        for file in tqdm(os.listdir(img_dir)):
+            if file.endswith(".jpg") or file.endswith(".png"):
+
+                '''load img and normalize it'''
+                # img_file_name = os.path.join(img_dir, file)
+                # img = Image.open(img_file_name)
+
+                '''load landmark npy, (has been augmented already)'''
+                hm_file_name = os.path.join(hm_dir, file[:-3] + "npy")
+                landmark_file_name = os.path.join(landmarks_dir, file[:-3] + "npy")
+                if not os.path.exists(landmark_file_name):
+                    continue
+                landmark = load(landmark_file_name)
+                '''convert to correct scale'''
+                _x_y, _x, _y = image_utility.create_landmarks_from_normalized(landmark, InputDataSize.image_input_size,
+                                                                              InputDataSize.image_input_size,
+                                                                              InputDataSize.img_center,
+                                                                              InputDataSize.img_center)
+
+                hm = self.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, np.array(_x_y), stride, False)
+                # imgpr.print_image_arr_heat(counter, hm, print_single=False)
+                save(hm_file_name, hm)
+                counter += 1
+        print("CREATING hm Done!")
+
     def create_face_graph(self, dataset_name, dataset_type):
         if dataset_name == DatasetName.ibug:
             img_dir = IbugConf.train_images_dir

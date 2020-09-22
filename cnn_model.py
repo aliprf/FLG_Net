@@ -45,43 +45,19 @@ class CNNModel:
             model = self.create_effGlassNet(input_shape=input_shape, input_tensor=input_tensor,
                                             num_landmark=num_landmark, num_face_graph_elements=num_face_graph_elements)
         elif arch == 'effDiscrimNet':
-            # model = self.create_resnetDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
             model = self.create_effDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
 
-        else:
-            model = self.create_effNet(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
+        elif arch == 'hm_reg_model':
+            model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
+        elif arch == 'cord_reg_model':
+            model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
+        elif arch == 'hm_Disc_model' or 'cord_Disc_model':
+            model = self.create_disc_model(input_shape=input_shape, input_tensor=input_tensor)
+
+
         return model
 
-    def create_resnetDiscrimNet(self, input_shape, input_tensor):
-        eff_net = keras.applications.resnet.ResNet50(include_top=True, weights=None, input_tensor=input_tensor,
-                                                     input_shape=input_shape, pooling=None, classes=1)
-        eff_net.summary()
-        model_json = eff_net.to_json()
-        with open("effDiscrimNet.json", "w") as json_file:
-            json_file.write(model_json)
-        return eff_net
-
-    def create_effDiscrimNet(self, input_shape, input_tensor):
-        """
-        This is EfficientNet-B7 used as a binary classifier network.
-        :param input_shape:
-        :param input_tensor:
-        :param num_landmark:
-        :return: model
-        """
-        eff_net = efn.EfficientNetB0(include_top=True,
-                                     weights=None,
-                                     input_tensor=input_tensor,
-                                     input_shape=input_shape,
-                                     pooling=None,
-                                     classes=1)
-        eff_net.summary()
-        model_json = eff_net.to_json()
-        with open("effDiscrimNet.json", "w") as json_file:
-            json_file.write(model_json)
-        return eff_net
-
-    def create_effGlassNet(self, input_shape, input_tensor, num_landmark, num_face_graph_elements):
+    def create_hm_reg_model(self, input_shape, input_tensor, num_landmark):
         """
         This is EfficientNet-B7 combined with one stack of StackedHourGlassNetwork used as heatmap & geo regressor network.
         :param input_shape:
@@ -150,20 +126,64 @@ class CNNModel:
         x = keras.layers.add([x, bn_0])  # 56, 56, 256
 
         '''out heatmap regression'''
-        out_heatmap = Conv2D(num_face_graph_elements, kernel_size=1, padding='same', name='O_hm')(x)
+        out_heatmap = Conv2D(num_landmark, kernel_size=1, padding='same', name='O_hm')(x)
+        eff_net = Model(inp, [out_heatmap])
+        eff_net.summary()
+
+        model_json = eff_net.to_json()
+        with open("hm_reg_model.json", "w") as json_file:
+            json_file.write(model_json)
+        return eff_net
+
+    def create_cord_reg_model(self, input_shape, input_tensor, num_landmark):
+        """
+        This is EfficientNet-B7 combined with one stack of StackedHourGlassNetwork used as heatmap & geo regressor network.
+        :param input_shape:
+        :param input_tensor:
+        :param num_landmark:
+        :return: model
+        """
+        eff_net = efn.EfficientNetB0(include_top=True,
+                                     weights=None,
+                                     input_tensor=input_tensor,
+                                     input_shape=input_shape,
+                                     pooling=None,
+                                     classes=num_landmark)  # or weights='noisy-student'
+
+        eff_net.layers.pop()
+        inp = eff_net.input
+
+        top_activation = eff_net.get_layer('top_activation').output
 
         '''out for geo regression'''
         x = GlobalAveragePooling2D()(top_activation)
         x = Dropout(0.5)(x)
         out_geo = Dense(num_landmark, name='O_geo')(x)
         #
-        eff_net = Model(inp, [out_heatmap, out_geo])
-        # eff_net = Model(inp, [out_heatmap])
-
+        eff_net = Model(inp, out_geo)
         eff_net.summary()
 
         model_json = eff_net.to_json()
-        with open("effGlassNet.json", "w") as json_file:
+        with open("cord_reg_model.json", "w") as json_file:
+            json_file.write(model_json)
+        return eff_net
+
+    def create_disc_model(self, input_shape, input_tensor):
+        """
+        This is EfficientNet-B7 used as a binary classifier network.
+        :param input_shape:
+        :param input_tensor:
+        :return: model
+        """
+        eff_net = efn.EfficientNetB0(include_top=True,
+                                     weights=None,
+                                     input_tensor=input_tensor,
+                                     input_shape=input_shape,
+                                     pooling=None,
+                                     classes=1)
+        eff_net.summary()
+        model_json = eff_net.to_json()
+        with open("Disc_model.json", "w") as json_file:
             json_file.write(model_json)
         return eff_net
 
@@ -187,71 +207,14 @@ class CNNModel:
             json_file.write(model_json)
         return eff_net
 
-    def create_MobileNet_nopose(self, inp_tensor, num_landmark):
-        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=None,
-                                                   alpha=1.0,
-                                                   include_top=True,
-                                                   weights=None,
-                                                   input_tensor=inp_tensor,
-                                                   pooling=None)
-        # model_json = mobilenet_model.to_json()
-        #
-        # with open("mobileNet_v2_main.json", "w") as json_file:
-        #     json_file.write(model_json)
-        #
-        # return mobilenet_model
-
-        mobilenet_model.layers.pop()
-
-        x = mobilenet_model.get_layer('global_average_pooling2d_1').output  # 1280
-        out_landmarks = Dense(num_landmark, name='O_L')(x)
-        out_poses = Dense(LearningConfig.pose_len, name='O_P')(x)
-
-        inp = mobilenet_model.input
-
-        revised_model = Model(inp, [out_landmarks])
-
-        revised_model.summary()
-        # plot_model(revised_model, to_file='mobileNet_v2_main.png', show_shapes=True, show_layer_names=True)
-        model_json = revised_model.to_json()
-
-        with open("mobileNet_v2_main_multi_out.json", "w") as json_file:
+    def create_resnetDiscrimNet(self, input_shape, input_tensor):
+        eff_net = keras.applications.resnet.ResNet50(include_top=True, weights=None, input_tensor=input_tensor,
+                                                     input_shape=input_shape, pooling=None, classes=1)
+        eff_net.summary()
+        model_json = eff_net.to_json()
+        with open("effDiscrimNet.json", "w") as json_file:
             json_file.write(model_json)
-
-        return revised_model
-
-    def create_MobileNet(self, inp_tensor, num_landmark, inp_shape):
-        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=inp_shape,
-                                                   alpha=1.0,
-                                                   include_top=True,
-                                                   weights=None,
-                                                   input_tensor=inp_tensor,
-                                                   pooling=None)
-        # model_json = mobilenet_model.to_json()
-        #
-        # with open("mobileNet_v2_main.json", "w") as json_file:
-        #     json_file.write(model_json)
-        #
-        # return mobilenet_model
-
-        mobilenet_model.layers.pop()
-
-        x = mobilenet_model.get_layer('global_average_pooling2d_1').output  # 1280
-        out_landmarks = Dense(num_landmark, name='O_L')(x)
-        out_poses = Dense(LearningConfig.pose_len, name='O_P')(x)
-
-        inp = mobilenet_model.input
-
-        revised_model = Model(inp, [out_landmarks, out_poses])
-
-        revised_model.summary()
-        # plot_model(revised_model, to_file='mobileNet_v2_main.png', show_shapes=True, show_layer_names=True)
-        model_json = revised_model.to_json()
-
-        with open("mobileNet_v2_main_multi_out.json", "w") as json_file:
-            json_file.write(model_json)
-
-        return revised_model
+        return eff_net
 
     def hour_glass_network(self, num_classes=68, num_stacks=10, num_filters=256,
                            in_shape=(224, 224), out_shape=(56, 56)):
@@ -261,32 +224,6 @@ class CNNModel:
                               out_shape=out_shape)
         model = hg_net.build_model(mobile=True)
         return model
-
-    def mobileNet_v2_main_discriminator(self, tensor, input_shape):
-        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=input_shape,
-                                                   alpha=1.0,
-                                                   include_top=True,
-                                                   weights=None,
-                                                   input_tensor=tensor,
-                                                   pooling=None)
-        # , classes=cnf.landmark_len)
-
-        mobilenet_model.layers.pop()
-
-        x = mobilenet_model.get_layer('global_average_pooling2d_2').output  # 1280
-        softmax = Dense(1, activation='sigmoid', name='out')(x)
-        inp = mobilenet_model.input
-
-        revised_model = Model(inp, softmax)
-
-        revised_model.summary()
-        # plot_model(revised_model, to_file='mobileNet_v2_main.png', show_shapes=True, show_layer_names=True)
-        model_json = revised_model.to_json()
-
-        with open("mobileNet_v2_main.json", "w") as json_file:
-            json_file.write(model_json)
-
-        return revised_model
 
     def mobileNet_v2_main(self, tensor):
         mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=None,

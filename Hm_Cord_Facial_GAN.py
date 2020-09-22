@@ -29,17 +29,26 @@ import img_printer as imgpr
 tf.logging.set_verbosity(tf.logging.ERROR)
 
 
-class FacialGAN:
-    def __init__(self, dataset_name, geo_custom_loss, regressor_arch,
-                 discriminator_arch, regressor_weight, discriminator_weight, input_shape_reg, input_shape_disc):
+class HmCordFacialGAN:
+    def __init__(self, dataset_name,hm_regressor_arch, cord_regressor_arch, hm_discriminator_arch,
+                 cord_discriminator_arch, hm_regressor_weight, cord_regressor_weight, hm_discriminator_weight,
+                 cord_discriminator_weight, input_shape_hm_reg, input_shape_cord_reg, input_shape_hm_disc,
+                 input_shape_cord_disc):
+
         self.dataset_name = dataset_name
-        self.geo_custom_loss = geo_custom_loss
-        self.regressor_arch = regressor_arch
-        self.discriminator_arch = discriminator_arch
-        self.regressor_weight = regressor_weight
-        self.discriminator_weight = discriminator_weight
-        self.input_shape_reg = input_shape_reg
-        self.input_shape_disc = input_shape_disc
+        self.hm_regressor_arch = hm_regressor_arch
+        self.cord_regressor_arch = cord_regressor_arch
+        self.hm_discriminator_arch = hm_discriminator_arch
+        self.cord_discriminator_arch = cord_discriminator_arch
+        self.hm_regressor_weight = hm_regressor_weight
+        self.cord_regressor_weight = cord_regressor_weight
+        self.hm_discriminator_weight = hm_discriminator_weight
+        self.cord_discriminator_weight = cord_discriminator_weight
+        self.input_shape_hm_reg = input_shape_hm_reg
+        self.input_shape_cord_reg = input_shape_cord_reg
+        self.input_shape_hm_disc = input_shape_hm_disc
+        self.input_shape_cord_disc = input_shape_cord_disc
+
         if dataset_name == DatasetName.ibug:
             self.SUM_OF_ALL_TRAIN_SAMPLES = IbugConf.number_of_all_sample
             self.num_landmark = IbugConf.num_of_landmarks * 2
@@ -64,11 +73,6 @@ class FacialGAN:
             self.train_hm_dir = WflwConf.graph_face_dir
             self.train_point_dir = WflwConf.normalized_points_npy_dir
             self.num_face_graph_elements = WflwConf.num_face_graph_elements
-        c_loss = Custom_losses(dataset_name, accuracy=100)
-        if geo_custom_loss:
-            self.geo_loss = c_loss.inter_landmark_loss
-        else:
-            self.geo_loss = losses.mean_squared_error
 
     def train_network(self):
         """
@@ -80,33 +84,49 @@ class FacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         '''Creating models:'''
-        regressor_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape_reg)
-        discriminator_model = self._create_discriminator_net(input_tensor=None, input_shape=self.input_shape_disc)
+        hm_regressor_model = self._create_hm_regressor_net(input_tensor=None, input_shape=self.input_shape_hm_reg)
+        cord_regressor_model = self._create_cord_regressor_net(input_tensor=None, input_shape=self.input_shape_cord_reg)
+
+        hm_discriminator_model = self._create_hm_discriminator_net(input_tensor=None, input_shape=self.input_shape_hm_disc)
+        cord_discriminator_model = self._create_cord_discriminator_net(input_tensor=None, input_shape=self.input_shape_cord_disc)
 
         '''Setting up GAN here:'''
         # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
         # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
 
-        regressor_model.trainable = True
-        discriminator_model.trainable = True
+        hm_regressor_model.trainable = True
+        cord_regressor_model.trainable = True
+        hm_discriminator_model.trainable = True
+        cord_discriminator_model.trainable = True
 
-        gan_input = Input(shape=self.input_shape_reg)
-        reg_out = self._fuse_hm_and_points(regressor_model(gan_input), gan_input)
-        gan_output = discriminator_model(reg_out)
-        gan_model = Model(gan_input, outputs=gan_output)
-        gan_model.compile(loss=keras.losses.binary_crossentropy,
-                          optimizer=self._get_optimizer())
-        ''''''
-        gan_model.summary()
+        '''lets create the first GAN'''
+        hm_gan_input = Input(shape=self.input_shape_hm_reg)
+        hm_reg_out = self._fuse_hm_with_points(hm_regressor_model(hm_gan_input), hm_gan_input)
+        hm_gan_output = hm_discriminator_model(hm_reg_out)
+        gan_model_hm = Model(hm_gan_input, outputs=hm_gan_output)
+        gan_model_hm.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
+
+        '''lets create the second GAN'''
+        cord_gan_input = Input(shape=self.input_shape_cord_reg)
+        cord_reg_out = self._fuse_points_with_hms(cord_regressor_model(cord_gan_input), cord_gan_input)
+        cord_gan_output = cord_discriminator_model(cord_reg_out)
+        gan_model_cord = Model(cord_gan_input, outputs=cord_gan_output)
+        gan_model_cord.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
+
+        gan_model_cord.summary()
         '''save GAN Model'''
         # gan_model.save_model('gw.h5')
-        plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
+        plot_model(gan_model_hm, to_file='gan_model_hm.png', show_shapes=True, show_layer_names=True)
+        plot_model(gan_model_cord, to_file='gan_model_cord.png', show_shapes=True, show_layer_names=True)
 
         # xx = tf.keras.models.load_model(gan_model, 'gan_model.h5')
         # tf.keras.models.save_model(gan_model, 'gan_model.h5')
-        # model_json = gan_model.to_json()
-        # with open("gan_model.json", "w") as json_file:
-        #     json_file.write(model_json)
+        hm_model_json = gan_model_hm.to_json()
+        with open("gan_model_hm.json", "w") as json_file:
+            json_file.write(hm_model_json)
+        cord_model_json = gan_model_cord.to_json()
+        with open("gan_model_cord.json", "w") as json_file:
+            json_file.write(cord_model_json)
 
         '''Save both model metrics in  a CSV file'''
         log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
@@ -141,27 +161,46 @@ class FacialGAN:
             self._write_loss_log(log_file_name, loss)
             gan_model.save_weights('weight_ep_' + str(epoch) + '_los_' + str(loss) + '.h5')
 
-    def _create_regressor_net(self, input_tensor, input_shape):
+    def _create_cord_regressor_net(self, input_tensor, input_shape):
         """
-        This is the main network, we use for predicting hm as well as points:
+        This is the main network, we use for predicting points:
         input:
             X: img
-            Y: [hm, points]
+            Y: [points]
 
         :param input_tensor:
         :param input_shape:
         :return: keras model created for the geo-hm regression task.
         """
         cnn = CNNModel()
-        model = cnn.get_model(input_tensor=input_tensor, arch=self.regressor_arch, num_landmark=self.num_landmark,
-                              input_shape=input_shape, num_face_graph_elements=self.num_face_graph_elements)
-        if self.regressor_weight is not None:
-            model.load_weights(self.regressor_weight)
-        model.compile(loss=self.geo_loss, optimizer=self._get_optimizer(), metrics=['mse'])
+        model = cnn.get_model(input_tensor=input_tensor, arch=self.cord_regressor_arch, num_landmark=self.num_landmark,
+                              input_shape=input_shape, num_face_graph_elements=None)
+        if self.cord_regressor_weight is not None:
+            model.load_weights(self.cord_regressor_weight)
+        model.compile(loss=keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
+        return model
+
+    def _create_hm_regressor_net(self, input_tensor, input_shape):
+        """
+        This is the main network, we use for predicting hm:
+        input:
+            X: img
+            Y: [hm]
+
+        :param input_tensor:
+        :param input_shape:
+        :return: keras model created for the geo-hm regression task.
+        """
+        cnn = CNNModel()
+        model = cnn.get_model(input_tensor=input_tensor, arch=self.hm_regressor_arch, num_landmark=self.num_landmark,
+                              input_shape=input_shape, num_face_graph_elements=None)
+        if self.hm_regressor_weight is not None:
+            model.load_weights(self.hm_regressor_weight)
+        model.compile(loss=keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
 
         return model
 
-    def _create_discriminator_net(self, input_tensor, input_shape):
+    def _create_hm_discriminator_net(self, input_tensor, input_shape):
         """
         This is the discriminator network, being used at the second stage when we want to discriminate
         the real and fake data, generated by the RegressorNetwork
@@ -171,10 +210,28 @@ class FacialGAN:
         """
 
         cnn = CNNModel()
-        model = cnn.get_model(input_tensor=input_tensor, arch=self.discriminator_arch, input_shape=input_shape,
-                              num_landmark=self.num_landmark, num_face_graph_elements=self.num_face_graph_elements)
-        if self.discriminator_weight is not None:
-            model.load_weights(self.discriminator_weight)
+        model = cnn.get_model(input_tensor=input_tensor, arch=self.hm_discriminator_arch, input_shape=input_shape,
+                              num_landmark=self.num_landmark, num_face_graph_elements=None)
+        if self.hm_discriminator_weight is not None:
+            model.load_weights(self.hm_discriminator_weight)
+        model.compile(loss=keras.losses.binary_crossentropy,
+                      optimizer=self._get_optimizer(lr=1e-4, decay=1e-6),
+                      metrics=['accuracy'])
+        return model
+
+    def _create_cord_discriminator_net(self, input_tensor, input_shape):
+        """
+        This is the discriminator network, being used at the second stage when we want to discriminate
+        the real and fake data, generated by the RegressorNetwork
+        :param input_tensor:
+        :param input_shape:
+        :return:
+        """
+        cnn = CNNModel()
+        model = cnn.get_model(input_tensor=input_tensor, arch=self.cord_discriminator_arch, input_shape=input_shape,
+                              num_landmark=self.num_landmark, num_face_graph_elements=None)
+        if self.cord_discriminator_weight is not None:
+            model.load_weights(self.cord_discriminator_weight)
         model.compile(loss=keras.losses.binary_crossentropy,
                       optimizer=self._get_optimizer(lr=1e-4, decay=1e-6),
                       metrics=['accuracy'])
