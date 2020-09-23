@@ -19,7 +19,7 @@ from keras import losses
 import csv
 from skimage.io import imread
 from keras.models import Model
-from keras.utils.vis_utils import plot_model
+from keras.utils import plot_model
 import itertools
 from skimage.transform import resize
 from image_utility import ImageUtility
@@ -109,14 +109,15 @@ class HmCordFacialGAN:
 
         hm_reg_out = self._fuse_hm_with_points(hm_regressor_model(hm_gan_input), cord_regressor_model(cord_gan_input), hm_gan_input)
         hm_gan_output = hm_discriminator_model(hm_reg_out)
+
         gan_model_hm = Model(hm_gan_input, outputs=hm_gan_output)
         gan_model_hm.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
 
         '''lets create the second GAN'''
-        cord_reg_out = self._fuse_points_with_hms(cord_regressor_model(cord_gan_input))
-        cord_gan_output = cord_discriminator_model(cord_reg_out)
-        gan_model_cord = Model(cord_gan_input, outputs=cord_gan_output)
-        gan_model_cord.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
+        # cord_reg_out = self._fuse_points_with_hms(cord_regressor_model(cord_gan_input))
+        # cord_gan_output = cord_discriminator_model(cord_reg_out)
+        # gan_model_cord = Model(cord_gan_input, outputs=cord_gan_output)
+        # gan_model_cord.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
 
         # gan_model_cord.summary()
         '''save GAN Model'''
@@ -365,13 +366,18 @@ class HmCordFacialGAN:
         :return:
         """
         # hm_tensor_t = tf.expand_dims(tf.math.reduce_sum(hm_tensor, axis=3), axis=3))
-        hm_tensor_summed = Lambda(lambda x: tf.expand_dims(tf.math.reduce_sum(x, axis=3), axis=3))(hm_tensor)
-        t_pn_img = Lambda(lambda x: tf.reshape(self._convert_to_geometric(hm_tensor_summed, tf.cast(x, 'int64')),
-                                               shape=[tf.shape(img_tensor_c)[0], InputDataSize.hm_size,
-                                                      InputDataSize.hm_size, 1]
-                                               ))(points_tensor)
 
-        # t_pn_img = Lambda(lambda x: self._convert_to_geometric(hm_tensor_summed, tf.cast(x, 'int64')))(points_tensor)
+        # hm_tensor_summed = tf.expand_dims(tf.math.reduce_sum(hm_tensor, axis=3), axis=3)
+        # t_pn_img_0 = self._convert_to_geometric(hm_tensor_summed, tf.cast(points_tensor, 'int64'))
+
+        hm_tensor_summed = Lambda(lambda x: tf.expand_dims(tf.math.reduce_sum(x, axis=3), axis=3))(hm_tensor)
+        # t_pn_img_0 = self._convert_to_geometric(hm_tensor_summed, tf.cast(points_tensor, 'int64'))
+
+        t_pn_img_0 = Lambda(lambda x: self._convert_to_geometric(hm_tensor_summed, tf.cast(x, 'int64')))(points_tensor)
+        t_pn_img = Lambda(lambda x: tf.reshape(tensor=x, shape=[tf.shape(hm_tensor_summed)[0], InputDataSize.hm_size,
+                                                                InputDataSize.hm_size, 1]))(t_pn_img_0)
+
+        # concat = Lambda(lambda x: keras.layers.Concatenate()([hm_tensor_summed, x]))(t_pn_img_0)
         concat = keras.layers.Concatenate()([hm_tensor_summed, t_pn_img])
         return concat
 
