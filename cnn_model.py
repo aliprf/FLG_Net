@@ -51,8 +51,10 @@ class CNNModel:
             model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
         elif arch == 'cord_reg_model':
             model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
-        elif arch == 'hm_Disc_model' or 'cord_Disc_model':
-            model = self.create_disc_model(input_shape=input_shape, input_tensor=input_tensor)
+        elif arch == 'hm_Disc_model':
+            model = self.create_hm_disc_model(input_shape=input_shape, input_tensor=input_tensor)
+        elif arch == 'cord_Disc_model':
+            model = self.create_cord_disc_model(input_shape=input_shape, input_tensor=input_tensor)
 
 
         return model
@@ -168,7 +170,23 @@ class CNNModel:
             json_file.write(model_json)
         return eff_net
 
-    def create_disc_model(self, input_shape, input_tensor):
+    def create_cord_disc_model(self, input_shape, input_tensor):
+        model = tf.keras.Sequential([
+            Dense(input_shape, activation='relu'),
+            Dense(128, activation='relu'),
+            Dense(128, activation='relu'),
+            Dense(128, activation='relu'),
+            Dropout(.5),
+            Dense(1)
+        ])
+        model.summary()
+        model_json = model.to_json()
+        with open("./model_arch/Disc_cord_model.json", "w") as json_file:
+            json_file.write(model_json)
+        return model
+
+
+    def create_hm_disc_model(self, input_shape, input_tensor):
         """
         This is EfficientNet-B7 used as a binary classifier network.
         :param input_shape:
@@ -183,7 +201,7 @@ class CNNModel:
                                      classes=1)
         eff_net.summary()
         model_json = eff_net.to_json()
-        with open("Disc_model.json", "w") as json_file:
+        with open("./model_arch/Disc_hm_model.json", "w") as json_file:
             json_file.write(model_json)
         return eff_net
 

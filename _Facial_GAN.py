@@ -19,62 +19,56 @@ from keras import losses
 import csv
 from skimage.io import imread
 from keras.models import Model
-from keras.utils import plot_model
+from keras.utils.vis_utils import plot_model
 import itertools
 from skimage.transform import resize
 from image_utility import ImageUtility
 import img_printer as imgpr
 
+
 tf.logging.set_verbosity(tf.logging.ERROR)
 
 
-class HmCordFacialGAN:
-    def __init__(self, dataset_name, hm_regressor_arch, cord_regressor_arch, hm_discriminator_arch,
-                 cord_discriminator_arch, hm_regressor_weight, cord_regressor_weight, hm_discriminator_weight,
-                 cord_discriminator_weight, input_shape_hm_reg, input_shape_cord_reg, input_shape_hm_disc,
-                 input_shape_cord_disc):
-
+class FacialGAN:
+    def __init__(self, dataset_name, geo_custom_loss, regressor_arch,
+                 discriminator_arch, regressor_weight, discriminator_weight, input_shape_reg, input_shape_disc):
         self.dataset_name = dataset_name
-        self.hm_regressor_arch = hm_regressor_arch
-        self.cord_regressor_arch = cord_regressor_arch
-        self.hm_discriminator_arch = hm_discriminator_arch
-        self.cord_discriminator_arch = cord_discriminator_arch
-        self.hm_regressor_weight = hm_regressor_weight
-        self.cord_regressor_weight = cord_regressor_weight
-        self.hm_discriminator_weight = hm_discriminator_weight
-        self.cord_discriminator_weight = cord_discriminator_weight
-        self.input_shape_hm_reg = input_shape_hm_reg
-        self.input_shape_cord_reg = input_shape_cord_reg
-        self.input_shape_hm_disc = input_shape_hm_disc
-        self.input_shape_cord_disc = input_shape_cord_disc
-
+        self.geo_custom_loss = geo_custom_loss
+        self.regressor_arch = regressor_arch
+        self.discriminator_arch = discriminator_arch
+        self.regressor_weight = regressor_weight
+        self.discriminator_weight = discriminator_weight
+        self.input_shape_reg = input_shape_reg
+        self.input_shape_disc = input_shape_disc
         if dataset_name == DatasetName.ibug:
             self.SUM_OF_ALL_TRAIN_SAMPLES = IbugConf.number_of_all_sample
             self.num_landmark = IbugConf.num_of_landmarks * 2
             self.num_face_graph_elements = IbugConf.num_face_graph_elements
             self.train_images_dir = IbugConf.train_images_dir
-            self.train_hm_dir = IbugConf.train_hm_dir
+            self.train_hm_dir = IbugConf.graph_face_dir
             self.train_point_dir = IbugConf.normalized_points_npy_dir
             self.num_face_graph_elements = IbugConf.num_face_graph_elements
-            self.hm_stride = IbugConf.hm_stride
         elif dataset_name == DatasetName.cofw:
             self.SUM_OF_ALL_TRAIN_SAMPLES = CofwConf.number_of_all_sample
             self.num_landmark = CofwConf.num_of_landmarks * 2
             self.num_face_graph_elements = CofwConf.num_face_graph_elements
             self.train_images_dir = CofwConf.train_images_dir
-            self.train_hm_dir = CofwConf.train_hm_dir
+            self.train_hm_dir = CofwConf.graph_face_dir
             self.train_point_dir = CofwConf.normalized_points_npy_dir
             self.num_face_graph_elements = CofwConf.num_face_graph_elements
-            self.hm_stride = CofwConf.hm_stride
         elif dataset_name == DatasetName.wflw:
             self.SUM_OF_ALL_TRAIN_SAMPLES = WflwConf.number_of_all_sample
             self.num_landmark = WflwConf.num_of_landmarks * 2
             self.num_face_graph_elements = WflwConf.num_face_graph_elements
             self.train_images_dir = WflwConf.train_images_dir
-            self.train_hm_dir = WflwConf.train_hm_dir
+            self.train_hm_dir = WflwConf.graph_face_dir
             self.train_point_dir = WflwConf.normalized_points_npy_dir
             self.num_face_graph_elements = WflwConf.num_face_graph_elements
-            self.hm_stride = WflwConf.hm_stride
+        c_loss = Custom_losses(dataset_name, accuracy=100)
+        if geo_custom_loss:
+            self.geo_loss = c_loss.inter_landmark_loss
+        else:
+            self.geo_loss = losses.mean_squared_error
 
     def train_network(self):
         """
@@ -86,60 +80,39 @@ class HmCordFacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         '''Creating models:'''
-        hm_regressor_model = self._create_hm_regressor_net(input_tensor=None, input_shape=self.input_shape_hm_reg)
-        cord_regressor_model = self._create_cord_regressor_net(input_tensor=None, input_shape=self.input_shape_cord_reg)
-
-        hm_discriminator_model = self._create_hm_discriminator_net(input_tensor=None, input_shape=self.input_shape_hm_disc)
-        cord_discriminator_model = self._create_cord_discriminator_net(input_tensor=None, input_shape=self.input_shape_cord_disc)
+        regressor_model = self._create_regressor_net(input_tensor=None, input_shape=self.input_shape_reg)
+        discriminator_model = self._create_discriminator_net(input_tensor=None, input_shape=self.input_shape_disc)
 
         '''Setting up GAN here:'''
         # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
         # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
 
-        hm_regressor_model.trainable = True
-        cord_regressor_model.trainable = True
-        hm_discriminator_model.trainable = True
-        cord_discriminator_model.trainable = True
+        regressor_model.trainable = True
+        discriminator_model.trainable = True
 
-        '''lets create the first GAN'''
-        hm_gan_input = Input(shape=self.input_shape_hm_reg)
-        cord_gan_input = Input(shape=self.input_shape_cord_reg)
-
-        hm_reg_out = self._fuse_hm_with_points(hm_regressor_model(hm_gan_input), cord_regressor_model(cord_gan_input), hm_gan_input)
-        hm_gan_output = hm_discriminator_model(hm_reg_out)
-
-        gan_model_hm = Model(hm_gan_input, outputs=hm_gan_output)
-        gan_model_hm.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
-
-        '''lets create the second GAN'''
-        cord_reg_out = self._fuse_points_with_hms(cord_regressor_model(cord_gan_input), hm_regressor_model(hm_gan_input))
-        cord_gan_output = cord_discriminator_model(cord_reg_out)
-        gan_model_cord = Model(cord_gan_input, outputs=cord_gan_output)
-        gan_model_cord.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
-
-        # gan_model_cord.summary()
+        gan_input = Input(shape=self.input_shape_reg)
+        reg_out = self._fuse_hm_and_points(regressor_model(gan_input), gan_input)
+        gan_output = discriminator_model(reg_out)
+        gan_model = Model(gan_input, outputs=gan_output)
+        gan_model.compile(loss=keras.losses.binary_crossentropy,
+                          optimizer=self._get_optimizer())
+        ''''''
+        gan_model.summary()
         '''save GAN Model'''
         # gan_model.save_model('gw.h5')
-        plot_model(gan_model_hm, to_file='./model_arch/gan_model_hm.png', show_shapes=True, show_layer_names=True)
-        plot_model(gan_model_cord, to_file='./model_arch/gan_model_cord.png', show_shapes=True, show_layer_names=True)
+        plot_model(gan_model, to_file='gan_model.png', show_shapes=True, show_layer_names=True)
 
         # xx = tf.keras.models.load_model(gan_model, 'gan_model.h5')
         # tf.keras.models.save_model(gan_model, 'gan_model.h5')
-
-        # hm_model_json = gan_model_hm.to_json()
-        # with open("./model_arch/gan_model_hm.json", "w") as json_file:
-        #     json_file.write(hm_model_json)
-        # cord_model_json = gan_model_cord.to_json()
-        # with open("./model_arch/gan_model_cord.json", "w") as json_file:
-        #     json_file.write(cord_model_json)
+        # model_json = gan_model.to_json()
+        # with open("gan_model.json", "w") as json_file:
+        #     json_file.write(model_json)
 
         '''Save both model metrics in  a CSV file'''
         log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
         metrics_names = ['epoch']
-        for metric in hm_regressor_model.metrics_names: metrics_names.append('hm_reg_' + metric)
-        for metric in cord_regressor_model.metrics_names: metrics_names.append('cord_reg_' + metric)
-        for metric in hm_discriminator_model.metrics_names: metrics_names.append('hm_disc_' + metric)
-        for metric in cord_discriminator_model.metrics_names: metrics_names.append('hm_disc_' + metric)
+        for metric in regressor_model.metrics_names: metrics_names.append('reg_' + metric)
+        for metric in discriminator_model.metrics_names: metrics_names.append('disc_' + metric)
         self._write_loss_log(log_file_name, metrics_names)
 
         '''Start training on batch here:'''
@@ -148,77 +121,47 @@ class HmCordFacialGAN:
             loss = []
             for batch_index in range(step_per_epoch):
                 # try:
-                '''get real data'''
                 images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
-                heatmaps_pr = hm_regressor_model.predict_on_batch(images)
-                '''prediction'''
-                points_pr = cord_regressor_model.predict_on_batch(images)
-                '''hm gan'''
-                hm_disc_x, hm_disc_y = self._prepare_hm_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr,
-                                                                                  points_pr, images, (epoch+1)*batch_index)
-                hm_d_loss = hm_discriminator_model.train_on_batch(hm_disc_x, hm_disc_y)
-                hm_y_gen = np.ones(LearningConfig.batch_size)
-                hm_g_loss = gan_model_hm.train_on_batch(images, hm_y_gen)
 
-                '''cord gan'''
-                cord_disc_x, cord_disc_y = self._prepare_hm_discriminator_model_input(heatmaps_gr, heatmaps_pr,
-                                                                                      points_gr, points_pr, images,
-                                                                                      (epoch + 1) * batch_index)
-                cord_d_loss = cord_discriminator_model.train_on_batch(cord_disc_x, cord_disc_y)
-                cord_y_gen = np.ones(LearningConfig.batch_size)
-                cord_g_loss = gan_model_cord.train_on_batch(images, cord_y_gen)
+                heatmaps_pr = regressor_model.predict_on_batch(images)
+                disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr, points_gr, images)
+                # heatmaps_pr, points_pr = regressor_model.predict_on_batch(images)
+                # disc_x, disc_y = self._prepare_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr, points_pr, images)
 
-                '''results'''
+                d_loss = discriminator_model.train_on_batch(disc_x, disc_y)
+                y_gen = np.ones(LearningConfig.batch_size)
+                g_loss = gan_model.train_on_batch(images, y_gen)
+
                 print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
-                      f' hm_Discriminator Loss: {hm_d_loss} \t\t hm_Generator Loss: {hm_g_loss}'
-                      f' cord_Discriminator Loss: {cord_d_loss} \t\t cord_Generator Loss: {cord_g_loss}')
+                      f' Discriminator Loss: {d_loss} \t\t Generator Loss: {g_loss}')
                 # except Exception as e:
                 #     print('Faced Exception in train: ' + str(e))
 
             loss.append(epoch)
             self._write_loss_log(log_file_name, loss)
-            gan_model_hm.save_weights('hm_weight_ep_' + str(epoch) + '_los_' + str(loss) + '.h5')
+            gan_model.save_weights('weight_ep_' + str(epoch) + '_los_' + str(loss) + '.h5')
 
-    def _create_cord_regressor_net(self, input_tensor, input_shape):
+    def _create_regressor_net(self, input_tensor, input_shape):
         """
-        This is the main network, we use for predicting points:
+        This is the main network, we use for predicting hm as well as points:
         input:
             X: img
-            Y: [points]
+            Y: [hm, points]
 
         :param input_tensor:
         :param input_shape:
         :return: keras model created for the geo-hm regression task.
         """
         cnn = CNNModel()
-        model = cnn.get_model(input_tensor=input_tensor, arch=self.cord_regressor_arch, num_landmark=self.num_landmark,
-                              input_shape=input_shape, num_face_graph_elements=None)
-        if self.cord_regressor_weight is not None:
-            model.load_weights(self.cord_regressor_weight)
-        model.compile(loss=keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
-        return model
-
-    def _create_hm_regressor_net(self, input_tensor, input_shape):
-        """
-        This is the main network, we use for predicting hm:
-        input:
-            X: img
-            Y: [hm]
-
-        :param input_tensor:
-        :param input_shape:
-        :return: keras model created for the geo-hm regression task.
-        """
-        cnn = CNNModel()
-        model = cnn.get_model(input_tensor=input_tensor, arch=self.hm_regressor_arch, num_landmark=self.num_landmark,
-                              input_shape=input_shape, num_face_graph_elements=None)
-        if self.hm_regressor_weight is not None:
-            model.load_weights(self.hm_regressor_weight)
-        model.compile(loss=keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
+        model = cnn.get_model(input_tensor=input_tensor, arch=self.regressor_arch, num_landmark=self.num_landmark,
+                              input_shape=input_shape, num_face_graph_elements=self.num_face_graph_elements)
+        if self.regressor_weight is not None:
+            model.load_weights(self.regressor_weight)
+        model.compile(loss=self.geo_loss, optimizer=self._get_optimizer(), metrics=['mse'])
 
         return model
 
-    def _create_hm_discriminator_net(self, input_tensor, input_shape):
+    def _create_discriminator_net(self, input_tensor, input_shape):
         """
         This is the discriminator network, being used at the second stage when we want to discriminate
         the real and fake data, generated by the RegressorNetwork
@@ -228,34 +171,16 @@ class HmCordFacialGAN:
         """
 
         cnn = CNNModel()
-        model = cnn.get_model(input_tensor=input_tensor, arch=self.hm_discriminator_arch, input_shape=input_shape,
-                              num_landmark=self.num_landmark, num_face_graph_elements=None)
-        if self.hm_discriminator_weight is not None:
-            model.load_weights(self.hm_discriminator_weight)
+        model = cnn.get_model(input_tensor=input_tensor, arch=self.discriminator_arch, input_shape=input_shape,
+                              num_landmark=self.num_landmark, num_face_graph_elements=self.num_face_graph_elements)
+        if self.discriminator_weight is not None:
+            model.load_weights(self.discriminator_weight)
         model.compile(loss=keras.losses.binary_crossentropy,
                       optimizer=self._get_optimizer(lr=1e-4, decay=1e-6),
                       metrics=['accuracy'])
         return model
 
-    def _create_cord_discriminator_net(self, input_tensor, input_shape):
-        """
-        This is the discriminator network, being used at the second stage when we want to discriminate
-        the real and fake data, generated by the RegressorNetwork
-        :param input_tensor:
-        :param input_shape:
-        :return:
-        """
-        cnn = CNNModel()
-        model = cnn.get_model(input_tensor=input_tensor, arch=self.cord_discriminator_arch, input_shape=input_shape,
-                              num_landmark=self.num_landmark, num_face_graph_elements=None)
-        if self.cord_discriminator_weight is not None:
-            model.load_weights(self.cord_discriminator_weight)
-        model.compile(loss=keras.losses.binary_crossentropy,
-                      optimizer=self._get_optimizer(lr=1e-4, decay=1e-6),
-                      metrics=['accuracy'])
-        return model
-
-    def _prepare_hm_discriminator_model_input(self, heatmaps_gr, heatmaps_pr, points_gr, points_pr, img, index):
+    def _prepare_discriminator_model_input(self, heatmaps_gr, heatmaps_pr, points_gr, points_pr, img):
         """
         at the first step, we fuse concat heatmaps + 2d_points.Then create real/fake labels
         :param heatmaps_gr:
@@ -267,14 +192,11 @@ class HmCordFacialGAN:
         """
 
         '''resize img to hm_size:'''
+        # img = tf.image.resize(img, [InputDataSize.hm_size, InputDataSize.hm_size]) --> the result will be a tensor
         img = resize(img, (LearningConfig.batch_size, InputDataSize.hm_size, InputDataSize.hm_size, 3))
-
         '''convert points to 2d facial graph:'''
-        fg_gt = np.expand_dims(self._points_to_2d(points_gr), axis=3)  # the result should be [bs, 56,56,1]
-        fg_pr = np.expand_dims(self._points_to_2d(points_pr), axis=3)
-        '''sum heatmaps'''
-        heatmaps_gr = np.expand_dims(np.sum(heatmaps_gr, axis=-1), axis=3)
-        heatmaps_pr = np.expand_dims(np.sum(heatmaps_pr, axis=-1), axis=3)
+        fg_gt = self._points_to_2d_face_graph(points_gr)
+        fg_pr = self._points_to_2d_face_graph(points_pr)
 
         '''for testing :'''
         # imgpr.print_image_arr_heat(100, fg_gt[0], print_single=False)
@@ -293,40 +215,15 @@ class HmCordFacialGAN:
         '''     in case we needed without img'''
         # real_X = np.concatenate([heatmaps_gr, fg_gt], axis=-1)
         # fake_X = np.concatenate([heatmaps_pr, fg_pr], axis=-1)
-
-        real_X = np.subtract(heatmaps_gr, fg_gt)
-        fake_X = np.subtract(heatmaps_pr, fg_pr)
-
-        # imgpr.print_image_arr_heat('real_0' + str(index), real_X[0], print_single=False)
-        # imgpr.print_image_arr_heat('real_1' + str(index), real_X[1], print_single=False)
-        # imgpr.print_image_arr_heat('fake_0' + str(index), fake_X[0], print_single=False)
-        # imgpr.print_image_arr_heat('fake_1' + str(index), fake_X[1], print_single=False)
+        real_X = np.add(heatmaps_gr, fg_gt)
+        fake_X = np.add(heatmaps_pr, fg_pr)
 
         '''create real/fake labels and attach to the input data'''
         X = np.concatenate((fake_X, real_X), axis=0)
         Y = np.zeros(2 * LearningConfig.batch_size)
-        Y[:LearningConfig.batch_size] = 0.9  # use smooth labels
+        Y[:LearningConfig.batch_size] = 0.9 # use smooth labels
 
         return X, Y
-
-    def _points_to_2d(self, _points):
-        """
-
-        :param _points:
-        :return:
-        """
-        tf_rec = TFRecordUtility(self.num_landmark)
-        image_utility = ImageUtility()
-        hm_arr = []
-        for i in range(LearningConfig.batch_size):
-            _x_y, _x, _y = image_utility.create_landmarks_from_normalized(_points[i], InputDataSize.image_input_size,
-                                                                          InputDataSize.image_input_size,
-                                                                          InputDataSize.img_center,
-                                                                          InputDataSize.img_center)
-            hm_multi_layer = tf_rec.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, np.array(_x_y), self.hm_stride/2, False)
-            hm = np.sum(hm_multi_layer, axis=2)
-            hm_arr.append(hm)
-        return np.array(hm_arr)
 
     def _points_to_2d_face_graph(self, _points):
         """
@@ -339,9 +236,9 @@ class HmCordFacialGAN:
         indx = 0
         for item in _points:
             point_scaled, px_1, py_1 = image_utility.create_landmarks_from_normalized(item, InputDataSize.hm_size,
-                                                                                      InputDataSize.hm_size,
-                                                                                      InputDataSize.hm_center,
-                                                                                      InputDataSize.hm_center)
+                                                                                InputDataSize.hm_size,
+                                                                                InputDataSize.hm_center,
+                                                                                InputDataSize.hm_center)
             # imgpr.print_image_arr('pts_' + str(indx), np.zeros([56,56]), px_1, py_1)
 
             points[indx, :] = point_scaled
@@ -352,18 +249,17 @@ class HmCordFacialGAN:
         '''convert from flatten to 2d'''
         points_2d = []
         for pnt in partial_points:
-            points_2d.append(pnt.reshape([LearningConfig.batch_size, len(pnt[1]) // 2, 2]))
+            points_2d.append(pnt.reshape([LearningConfig.batch_size, len(pnt[1])//2, 2]))
         '''create the spare img for each facial part:'''
-        hm_img = np.zeros(
-            [LearningConfig.batch_size, InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
+        hm_img = np.zeros([LearningConfig.batch_size, InputDataSize.hm_size, InputDataSize.hm_size, self.num_face_graph_elements])
         # bs, 12 * 2
         for i in range(LearningConfig.batch_size):
             for j in range(self.num_face_graph_elements):
                 t_hm = np.zeros([InputDataSize.hm_size, InputDataSize.hm_size])
                 for x_y in points_2d[j][i]:
-                    if not (0 <= x_y[0] <= InputDataSize.hm_size - 1):
+                    if not(0 <= x_y[0] <= InputDataSize.hm_size-1):
                         x_y[0] = 0
-                    if not (0 <= x_y[1] <= InputDataSize.hm_size - 1):
+                    if not(0 <= x_y[1] <= InputDataSize.hm_size-1):
                         x_y[1] = 0
                     t_hm[int(x_y[1]), int(x_y[0])] = 1
 
@@ -371,64 +267,14 @@ class HmCordFacialGAN:
 
         return hm_img
 
-    def _fuse_hm_with_points(self, hm_tensor, points_tensor, img_tensor):
+    def _fuse_hm_and_points(self, regressor_output, regressor_input):
         """
-        convert hm_tensor{bs, 56,56, 68} ==> {bs, 56,56,1} and concat it with the img{224, 224, 3}
-        :param hm_tensor:
-        :param points_tensor:
-        :param img_tensor:
-        :return:
+
+        :param regressor_output:[ [?, ?, ?, 8], [?, 136] ]
+        :return: [bs, 56, 56, num_fg*2] ==> hm, points
         """
-        return Lambda(lambda x: tf.expand_dims(tf.math.reduce_sum(x, axis=3), axis=3))(hm_tensor)
-
-
-        # hm_tensor_t = tf.expand_dims(tf.math.reduce_sum(hm_tensor, axis=3), axis=3))
-
-        # hm_tensor_summed = tf.expand_dims(tf.math.reduce_sum(hm_tensor, axis=3), axis=3)
-        # t_pn_img_0 = self._convert_to_geometric(hm_tensor_summed, tf.cast(points_tensor, 'int64'))
-
-        hm_tensor_summed = Lambda(lambda x: tf.expand_dims(tf.math.reduce_sum(x, axis=3), axis=3))(hm_tensor)
-        # t_pn_img_0 = self._convert_to_geometric(hm_tensor_summed, tf.cast(points_tensor, 'int64'))
-
-        t_pn_img_0 = Lambda(lambda x: self._convert_to_geometric(hm_tensor_summed, tf.cast(x, 'int64')))(points_tensor)
-        t_pn_img = Lambda(lambda x: tf.reshape(tensor=x, shape=[tf.shape(hm_tensor_summed)[0], InputDataSize.hm_size,
-                                                                InputDataSize.hm_size, 1]))(t_pn_img_0)
-
-        # concat = Lambda(lambda x: keras.layers.Concatenate()([hm_tensor_summed, x]))(t_pn_img_0)
-        concat = keras.layers.Concatenate()([hm_tensor_summed, t_pn_img])
-        return concat
-
-        '''fuse img + hm '''
-        img_tensor_c = tf.image.resize(img_tensor, [InputDataSize.hm_size, InputDataSize.hm_size])
-        hm_tensor_t = tf.expand_dims(tf.math.reduce_sum(hm_tensor, axis=3), axis=3)
-        hm_tensor_c = tf.reshape(tensor=hm_tensor_t, shape=[tf.shape(img_tensor_c)[0], InputDataSize.hm_size,
-                                                            InputDataSize.hm_size, 1])
-
-        return Lambda(lambda x: keras.layers.Concatenate()([hm_tensor_c, img_tensor_c]))
-
-        # '''the expected one'''
-        # t_hm = regressor_output[0]
-        # t_hm_cp = regressor_output[0]
-        # t_pn = regressor_output[1]
-        #
-        # t_inp_img = tf.image.resize(regressor_input, [InputDataSize.hm_size, InputDataSize.hm_size])
-        # t_hm = keras.layers.Concatenate()([t_inp_img, t_hm])
-        #
-        # t_pn_img = Lambda(lambda x: self._convert_to_geometric(t_hm_cp, tf.cast(x, 'int64')))(t_pn)
-        # t_fused = Lambda(lambda x: self._fuse_tensors(t_hm, x))(t_pn_img)
-        # return t_fused
-
-    def _fuse_points_with_hms(self, points_tensor, hm_tensor):
-        """
-        :param points_tensor:
-        :param img_tensor:
-        :return:
-        """
-        hm_tensor = Lambda(lambda x: tf.expand_dims(tf.math.reduce_sum(x, axis=3), axis=3))(hm_tensor)
-
-        return Lambda(lambda x: self._convert_to_geometric(hm_tensor, tf.cast(x, 'int64')))(points_tensor)
-
-        # return points_tensor
+        # return keras.layers.Concatenate()([regressor_output[0], regressor_output[0]])
+        return regressor_output
 
         '''the expected one'''
         t_hm = regressor_output[0]
@@ -454,32 +300,31 @@ class HmCordFacialGAN:
 
     def _convert_to_geometric(self, hm_img, coordinates):
         """
-        :param hm_img: bs * 56 * 56 * 1
-        :param coordinates: bs * 136
+        :param img: ? * 56 * 56 * num_face_graph_elements
+        :param coordinates: ? * 136
         :return:
         """
 
         '''create a clean copy of generated image '''
         img_indices = tf.constant([[x] for x in range(LearningConfig.batch_size)])
         img_updates = tf.zeros([LearningConfig.batch_size, InputDataSize.hm_size,
-                                InputDataSize.hm_size, 1], dtype=tf.float32)
+                                InputDataSize.hm_size, self.num_face_graph_elements], dtype=tf.float32)
         hm_img = tf.tensor_scatter_nd_update(hm_img, img_indices, img_updates)
 
         '''convert two_d_coords to facial part:'''
-        # sep_1_d_cord = self._slice_face_graph_tensor(coordinates)
-        sep_1_d_cord = coordinates
+        sep_1_d_cord = self._slice_face_graph_tensor(coordinates)
 
         '''convert all points to 2d:'''
         counter = 0
         indices = []
-
-        '''convert to hm_scale: from  { from (-0.5, -0.5): (0.5, 0.5) => (0, 0): (56, 56)}'''
-        cord_item = tf.map_fn(fn=lambda landmark: InputDataSize.hm_center + landmark * InputDataSize.hm_size,
-                              elems=sep_1_d_cord)
-        '''convert to 2d'''
-        two_d_coords = tf.reshape(tensor=cord_item, shape=[-1, cord_item.shape[1] // 2, 2])  # ?(batch_size)*k*2
-        indices.append(self._create_2d_indices(two_d_coords, counter))
-        counter += counter
+        for cord_item_normal in sep_1_d_cord:
+            '''convert to hm_scale: from  { from (-0.5, -0.5): (0.5, 0.5) => (0, 0): (56, 56)}'''
+            cord_item = tf.map_fn(fn=lambda landmark: InputDataSize.hm_center + landmark * InputDataSize.hm_size,
+                                  elems=cord_item_normal)
+            '''convert to 2d'''
+            two_d_coords = tf.reshape(tensor=cord_item, shape=[-1, cord_item.shape[1] // 2, 2])  # ?(batch_size)*k*2
+            indices.append(self._create_2d_indices(two_d_coords, counter))
+            counter += counter
 
         '''Then, for each 2d layer,scatter it to a 56*56 image (our hm_img)'''
         merged_indices = list(itertools.chain.from_iterable(indices))
@@ -495,7 +340,7 @@ class HmCordFacialGAN:
             for x_indx in range(two_d_coords.shape[1]):  # cordinates
                 x = two_d_coords[batch_indx, x_indx][0]
                 y = two_d_coords[batch_indx, x_indx][1]
-                item = [batch_indx, y, x, counter]  # the coordination should be y,x NOT x,y
+                item = [batch_indx, y, x, counter] # the coordination should be y,x NOT x,y
                 # item = [batch_indx, x, y, counter]
                 indices.append(item)
         return indices
