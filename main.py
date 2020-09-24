@@ -1,5 +1,5 @@
 from tf_record_utility import TFRecordUtility
-from configuration import DatasetName, DatasetType, AffectnetConf, IbugConf,\
+from configuration import DatasetName, DatasetType, AffectnetConf, IbugConf, \
     W300Conf, InputDataSize, CofwConf, WflwConf, LearningConfig
 from cnn_model import CNNModel
 from pca_utility import PCAUtility
@@ -7,20 +7,17 @@ from image_utility import ImageUtility
 import numpy as np
 from train import Train
 from test import Test
-# from Facial_GAN import FacialGAN
-from Hm_Cord_Facial_GAN import HmCordFacialGAN
+from Facial_GAN import FacialGAN
+# from Hm_Cord_Facial_GAN import HmCordFacialGAN
 
 import tensorflow as tf
 import keras
 import keras.backend as K
 
 if __name__ == '__main__':
-
     pca_utility = PCAUtility()
     cnn_model = CNNModel()
     image_utility = ImageUtility()
-
-
 
     # tf_record_util.test_hm_accuracy()
     # tf_record_util.create_adv_att_img_hm()
@@ -34,7 +31,7 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks*2)
+    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks * 2)
     # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
     # # # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
     # # '''     normalize the points and save'''
@@ -42,7 +39,6 @@ if __name__ == '__main__':
     # # # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
     # tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
     # tf_record_util.create_all_heatmap(dataset_name=DatasetName.ibug, dataset_type=None)
-
 
     '''--> retrive and test tfRecords'''
     # tf_record_util = TFRecordUtility(WflwConf.num_of_landmarks*2)
@@ -74,12 +70,13 @@ if __name__ == '__main__':
     #             weight_fname='weights-94--0.01342.h5', has_pose=True, customLoss=False)
 
     '''--> Train Model'''
-    fg = HmCordFacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model', cord_regressor_arch='cord_reg_model',
-                         hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
-                         hm_regressor_weight=None, cord_regressor_weight=None,
-                         hm_discriminator_weight=None, cord_discriminator_weight=None,
-                         input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                         input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                         input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 1],  # we suppose to fuse data[ hm1, p_hm1, img3]
-                         input_shape_cord_disc=[IbugConf.num_of_landmarks, 1, 1])
+    fg = FacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model',
+                   cord_regressor_arch='cord_reg_model',
+                   hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
+                   hm_regressor_weight=None, cord_regressor_weight=None,
+                   hm_discriminator_weight=None, cord_discriminator_weight=None,
+                   input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+                   input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+                   input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 1],
+                   input_shape_cord_disc=[IbugConf.num_of_landmarks])
     fg.train_network()
