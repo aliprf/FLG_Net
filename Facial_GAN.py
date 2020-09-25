@@ -165,7 +165,7 @@ class FacialGAN:
             hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm)
             cord_reg_loss = self.generator_loss(real_output=points_gr, fake_output=points_pr)
             cord_disc_loss = self.discriminator_loss(real_output=real_pts, fake_output=fake_pts)
-            tf.print("Training loss (for one batch) at epoch %d ->step %d IS %.4f" % (epoch, step, float(hm_reg_loss)))
+            tf.print("Training loss (for one batch) IS " + hm_reg_loss)
 
         print('Gradient process start:')
         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
