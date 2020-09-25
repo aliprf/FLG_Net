@@ -3,21 +3,22 @@ from configuration import DatasetName, DatasetType, \
 from hg_Class import HourglassNet
 
 import tensorflow as tf
-import keras
+import tensorflow.keras as keras
+from tensorflow.keras import backend as K
+
+# import keras
 from skimage.transform import resize
 
 from keras.regularizers import l2, l1
 
 # tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
-from keras.models import Model
-from keras.applications import mobilenet_v2, mobilenet, resnet50, densenet
-from keras.layers import Dense, MaxPooling2D, Conv2D, Flatten, \
-    BatchNormalization, Activation, GlobalAveragePooling2D, DepthwiseConv2D, Dropout, ReLU, Concatenate, \
-    Deconvolution2D, Input, GlobalMaxPool2D
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications import mobilenet_v2, mobilenet, resnet50, densenet
+from tensorflow.keras.layers import Dense, MaxPooling2D, Conv2D, Flatten, Conv2DTranspose, BatchNormalization,\
+    Activation, GlobalAveragePooling2D, DepthwiseConv2D, Dropout, ReLU, Concatenate, Input, GlobalMaxPool2D
 
 from keras.callbacks import ModelCheckpoint
-from keras import backend as K
 
 from keras.optimizers import adam
 import numpy as np
@@ -35,7 +36,8 @@ import scipy.io as sio
 from keras.engine import InputLayer
 # import coremltools
 
-import efficientnet.keras as efn
+# import efficientnet.keras as efn
+import efficientnet.tfkeras as efn
 
 
 class CNNModel:
@@ -67,6 +69,7 @@ class CNNModel:
         :param num_landmark:
         :return: model
         """
+
         eff_net = efn.EfficientNetB0(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
@@ -78,17 +81,17 @@ class CNNModel:
         inp = eff_net.input
 
         top_activation = eff_net.get_layer('top_activation').output
-        x = Deconvolution2D(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
+        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             kernel_initializer='he_uniform')(top_activation)  # 14, 14, 256
         x = BatchNormalization()(x)
         x = ReLU()(x)
 
-        x = Deconvolution2D(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
+        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             kernel_initializer='he_uniform')(x)  # 28, 28, 256
         x = BatchNormalization()(x)
         x = ReLU()(x)
 
-        x = Deconvolution2D(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
+        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             kernel_initializer='he_uniform')(x)  # 56, 56, 256
         bn_0 = BatchNormalization(name='bn_0')(x)
         x = ReLU()(bn_0)
@@ -110,19 +113,19 @@ class CNNModel:
         x = ReLU()(bn_3)
 
         '''increase to  56'''
-        x = Deconvolution2D(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
+        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv1', kernel_initializer='he_uniform')(x)  # 14, 14, 256
         x = BatchNormalization()(x)
         x = keras.layers.add([x, bn_2])  # 14, 14, 256
         x = ReLU()(x)
 
-        x = Deconvolution2D(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
+        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv2', kernel_initializer='he_uniform')(x)  # 28, 28, 256
         x = BatchNormalization()(x)
         x = keras.layers.add([x, bn_1])  # 28, 28, 256
         x = ReLU()(x)
 
-        x = Deconvolution2D(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
+        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv3', kernel_initializer='he_uniform')(x)  # 56, 56, 256
         x = BatchNormalization()(x)
         x = keras.layers.add([x, bn_0])  # 56, 56, 256
@@ -145,6 +148,7 @@ class CNNModel:
         :param num_landmark:
         :return: model
         """
+
         eff_net = efn.EfficientNetB0(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
@@ -171,18 +175,20 @@ class CNNModel:
         return eff_net
 
     def create_cord_disc_model(self, input_shape, input_tensor):
-        model = tf.keras.Sequential([
-            Dense(input_shape, activation='relu'),
-            Dense(128, activation='relu'),
-            Dense(128, activation='relu'),
-            Dense(128, activation='relu'),
-            Dropout(.5),
-            Dense(1)
-        ])
+
+        inputs = inputs = keras.Input(shape=(input_shape,))
+        x = Dense(128, activation="relu")(inputs)
+        x = Dense(128, activation="relu")(x)
+        x = Dense(128, activation="relu")(x)
+        x = Dropout(.5)(x)
+        outputs = Dense(1)(x)
+
+        model = keras.Model(inputs=inputs, outputs=outputs, name="cord_disc_model")
         model.summary()
-        model_json = model.to_json()
-        with open("./model_arch/Disc_cord_model.json", "w") as json_file:
-            json_file.write(model_json)
+
+        # model_json = model.to_json()
+        # with open("./model_arch/Disc_cord_model.json", "w") as json_file:
+        #     json_file.write(model_json)
         return model
 
 

@@ -82,6 +82,7 @@ class FacialGAN:
                               input_shape=self.input_shape_hm_reg, num_face_graph_elements=None)
         if self.hm_regressor_weight is not None:
             model.load_weights(self.hm_regressor_weight)
+        return model
 
     def make_cord_generator_model(self):
         cnn = CNNModel()
@@ -89,6 +90,7 @@ class FacialGAN:
                               input_shape=self.input_shape_cord_reg, num_face_graph_elements=None)
         if self.cord_regressor_weight is not None:
             model.load_weights(self.cord_regressor_weight)
+        return model
 
     def make_hm_discriminator_model(self):
         cnn = CNNModel()
@@ -96,6 +98,7 @@ class FacialGAN:
                               input_shape=self.input_shape_hm_disc, num_face_graph_elements=None)
         if self.hm_discriminator_weight is not None:
             model.load_weights(self.hm_discriminator_weight)
+        return model
 
     def make_cord_discriminator_model(self):
         cnn = CNNModel()
@@ -103,7 +106,7 @@ class FacialGAN:
                               input_shape=self.input_shape_cord_disc, num_face_graph_elements=None)
         if self.cord_discriminator_weight is not None:
             model.load_weights(self.cord_discriminator_weight)
-
+        return model
 
     def discriminator_loss(self, real_output, fake_output):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -121,9 +124,9 @@ class FacialGAN:
 
         return 10 * loss_gen + loss_disc
 
-    def create_ckpt(self, hm_generator_optimizer,cord_generator_optimizer,hm_discriminator_optimizer,
-                    cord_discriminator_optimizer, hm_generator, cord_generator, hm_discriminator, cord_discriminator):
-        checkpoint_dir = './training_checkpoints'
+    def _create_ckpt(self, epoch, hm_generator_optimizer, cord_generator_optimizer, hm_discriminator_optimizer,
+                     cord_discriminator_optimizer, hm_generator, cord_generator, hm_discriminator, cord_discriminator):
+        checkpoint_dir = './training_checkpoints/'
         checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
         checkpoint = tf.train.Checkpoint(hm_generator_optimizer=hm_generator_optimizer,
                                          cord_generator_optimizer=cord_generator_optimizer,
@@ -133,106 +136,87 @@ class FacialGAN:
                                          cord_generator=cord_generator,
                                          hm_discriminator=hm_discriminator,
                                          cord_discriminator=cord_discriminator)
+        checkpoint.save(file_prefix=checkpoint_prefix)
+        '''save model weights'''
+        hm_generator.save_weights(checkpoint_dir + 'hm_reg_' + str(epoch) + '_.h5')
+        cord_generator.save_weights(checkpoint_dir + 'cord_reg_' + str(epoch) + '_.h5')
+        hm_discriminator.save_weights(checkpoint_dir + 'hm_disc_' + str(epoch) + '_.h5')
+        cord_discriminator.save_weights(checkpoint_dir + 'cord_disc_' + str(epoch) + '_.h5')
 
-    # -----------------------------------------------------
+    @tf.function
+    def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model, cord_reg_model, cord_disc_model,
+                   hm_reg_optimizer, hm_disc_optimizer, cord_reg_optimizer, cord_disc_optimizer):
 
-    def train_network(self):
-        """
-        Training Network:
-        :return:
-        """
+        with tf.GradientTape() as hm_reg_tape, tf.GradientTape() as hm_disc_tape \
+                , tf.GradientTape() as cord_reg_tape, tf.GradientTape() as cord_disc_tape:
 
-        '''create train, validation, test data iterator'''
+            images = tf.cast(images, tf.float32)
+            points_gr = tf.cast(points_gr, tf.float32)
+            '''prediction'''
+            heatmaps_pr = hm_reg_model(images)
+            points_pr = cord_reg_model(images)
+
+            '''hm GAN'''
+            fused_heatmaps_gr = self.fuse_hm(heatmaps_gr, points_gr)
+            fused_heatmaps_pr = self.fuse_hm(heatmaps_pr, points_gr)
+            real_hm = hm_disc_model(fused_heatmaps_gr)
+            fake_hm = hm_disc_model(fused_heatmaps_pr)
+            '''cord GAN'''
+            fake_pts = cord_disc_model(points_pr)
+            real_pts = cord_disc_model(points_gr)
+            '''loss calculation'''
+            hm_reg_loss = self.generator_loss(real_output=heatmaps_gr, fake_output=heatmaps_pr)
+            hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm)
+            cord_reg_loss = self.generator_loss(real_output=points_gr, fake_output=points_pr)
+            cord_disc_loss = self.discriminator_loss(real_output=real_pts, fake_output=fake_pts)
+            # print("Training loss (for one batch) at epoch %d ->step %d IS %.4f" % (epoch, step, float(hm_reg_loss)))
+
+        print('Gradient process start:')
+        gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
+        gradients_of_hm_disc = hm_disc_tape.gradient(hm_disc_loss, hm_disc_model.trainable_variables)
+        gradients_of_cord_reg = cord_reg_tape.gradient(cord_reg_loss, cord_reg_model.trainable_variables)
+        gradients_of_cord_disc = cord_disc_tape.gradient(cord_disc_loss, cord_disc_model.trainable_variables)
+        print('apply_gradients start:')
+        hm_reg_optimizer.apply_gradients(zip(gradients_of_hm_reg, hm_reg_model.trainable_variables))
+        hm_disc_optimizer.apply_gradients(zip(gradients_of_hm_disc, hm_disc_model.trainable_variables))
+        cord_reg_optimizer.apply_gradients(zip(gradients_of_cord_reg, cord_reg_model.trainable_variables))
+        cord_disc_optimizer.apply_gradients(zip(gradients_of_cord_disc, cord_disc_model.trainable_variables))
+
+    def train(self):
+
+        hm_reg_model = self.make_hm_generator_model()
+        hm_disc_model = self.make_hm_discriminator_model()
+        cord_reg_model = self.make_cord_generator_model()
+        cord_disc_model = self.make_cord_discriminator_model()
+
+        hm_reg_optimizer = self._get_optimizer(lr=1e-4)
+        hm_disc_optimizer = self._get_optimizer(lr=1e-4)
+        cord_reg_optimizer = self._get_optimizer(lr=1e-4)
+        cord_disc_optimizer = self._get_optimizer(lr=1e-4)
+
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
-        '''Creating models:'''
-        hm_regressor_model = self._create_hm_regressor_net(input_tensor=None, input_shape=self.input_shape_hm_reg)
-        cord_regressor_model = self._create_cord_regressor_net(input_tensor=None, input_shape=self.input_shape_cord_reg)
-
-        hm_discriminator_model = self._create_hm_discriminator_net(input_tensor=None, input_shape=self.input_shape_hm_disc)
-        cord_discriminator_model = self._create_cord_discriminator_net(input_tensor=None, input_shape=self.input_shape_cord_disc)
-
-        '''Setting up GAN here:'''
-        # i_tensor = K.variable(np.zeros([LearningConfig.batch_size, 224, 224, 3]))
-        # gan_model_input = Input(shape=self.input_shape_reg, tensor=i_tensor)
-
-        '''lets create the first GAN'''
-        hm_gan_input = Input(shape=self.input_shape_hm_reg)
-        cord_gan_input = Input(shape=self.input_shape_cord_reg)
-
-        hm_reg_out = self._fuse_hm_with_points(hm_regressor_model(hm_gan_input), cord_regressor_model(cord_gan_input), hm_gan_input)
-        hm_gan_output = hm_discriminator_model(hm_reg_out)
-
-        gan_model_hm = Model(hm_gan_input, outputs=hm_gan_output)
-        gan_model_hm.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
-
-        '''lets create the second GAN'''
-        cord_reg_out = self._fuse_points_with_hms(cord_regressor_model(cord_gan_input), hm_regressor_model(hm_gan_input))
-        cord_gan_output = cord_discriminator_model(cord_reg_out)
-        gan_model_cord = Model(cord_gan_input, outputs=cord_gan_output)
-        gan_model_cord.compile(loss=keras.losses.binary_crossentropy, optimizer=self._get_optimizer())
-
-        # gan_model_cord.summary()
-        '''save GAN Model'''
-        # gan_model.save_model('gw.h5')
-        plot_model(gan_model_hm, to_file='./model_arch/gan_model_hm.png', show_shapes=True, show_layer_names=True)
-        plot_model(gan_model_cord, to_file='./model_arch/gan_model_cord.png', show_shapes=True, show_layer_names=True)
-
-        # xx = tf.keras.models.load_model(gan_model, 'gan_model.h5')
-        # tf.keras.models.save_model(gan_model, 'gan_model.h5')
-
-        # hm_model_json = gan_model_hm.to_json()
-        # with open("./model_arch/gan_model_hm.json", "w") as json_file:
-        #     json_file.write(hm_model_json)
-        # cord_model_json = gan_model_cord.to_json()
-        # with open("./model_arch/gan_model_cord.json", "w") as json_file:
-        #     json_file.write(cord_model_json)
-
-        '''Save both model metrics in  a CSV file'''
-        log_file_name = './train_logs/log_' + datetime.now().strftime("%Y%m%d-%H%M%S") + ".csv"
-        metrics_names = ['epoch']
-        for metric in hm_regressor_model.metrics_names: metrics_names.append('hm_reg_' + metric)
-        for metric in cord_regressor_model.metrics_names: metrics_names.append('cord_reg_' + metric)
-        for metric in hm_discriminator_model.metrics_names: metrics_names.append('hm_disc_' + metric)
-        for metric in cord_discriminator_model.metrics_names: metrics_names.append('hm_disc_' + metric)
-        self._write_loss_log(log_file_name, metrics_names)
-
-        '''Start training on batch here:'''
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
         for epoch in range(LearningConfig.epochs):
-            loss = []
             for batch_index in range(step_per_epoch):
-                # try:
-                '''get real data'''
+                self._create_ckpt(epoch, hm_reg_optimizer, cord_reg_optimizer, hm_disc_optimizer, cord_disc_optimizer,
+                                  hm_reg_model, cord_reg_model, hm_disc_model, cord_disc_model)
                 images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
-                heatmaps_pr = hm_regressor_model.predict_on_batch(images)
-                '''prediction'''
-                points_pr = cord_regressor_model.predict_on_batch(images)
-                '''hm gan'''
-                hm_disc_x, hm_disc_y = self._prepare_hm_discriminator_model_input(heatmaps_gr, heatmaps_pr, points_gr,
-                                                                                  points_pr, images, (epoch+1)*batch_index)
-                hm_d_loss = hm_discriminator_model.train_on_batch(hm_disc_x, hm_disc_y)
-                hm_y_gen = np.ones(LearningConfig.batch_size)
-                hm_g_loss = gan_model_hm.train_on_batch(images, hm_y_gen)
+                self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
+                                hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
+                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                                cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
+                print('batch_index: ' + str(batch_index))
+            # Save the model every 2 epochs
+            if (epoch + 1) % 2 == 0:
+                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+                                  cord_generator_optimizer=cord_reg_optimizer,
+                                  hm_discriminator_optimizer=hm_disc_optimizer,
+                                  cord_discriminator_optimizer=cord_disc_optimizer,
+                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
-                '''cord gan'''
-                cord_disc_x, cord_disc_y = self._prepare_hm_discriminator_model_input(heatmaps_gr, heatmaps_pr,
-                                                                                      points_gr, points_pr, images,
-                                                                                      (epoch + 1) * batch_index)
-                cord_d_loss = cord_discriminator_model.train_on_batch(cord_disc_x, cord_disc_y)
-                cord_y_gen = np.ones(LearningConfig.batch_size)
-                cord_g_loss = gan_model_cord.train_on_batch(images, cord_y_gen)
-
-                '''results'''
-                print(f'Epoch: {epoch} \t \t batch:{batch_index} of {step_per_epoch}\t\n '
-                      f' hm_Discriminator Loss: {hm_d_loss} \t\t hm_Generator Loss: {hm_g_loss}'
-                      f' cord_Discriminator Loss: {cord_d_loss} \t\t cord_Generator Loss: {cord_g_loss}')
-                # except Exception as e:
-                #     print('Faced Exception in train: ' + str(e))
-
-            loss.append(epoch)
-            self._write_loss_log(log_file_name, loss)
-            gan_model_hm.save_weights('hm_weight_ep_' + str(epoch) + '_los_' + str(loss) + '.h5')
+    # -----------------------------------------------------
 
     def _create_cord_regressor_net(self, input_tensor, input_shape, is_trainable=True):
         """
@@ -315,6 +299,15 @@ class FacialGAN:
                       metrics=['accuracy'])
         return model
 
+    def fuse_hm(self, heatmaps, points):
+        return tf.expand_dims(tf.math.reduce_sum(heatmaps, axis=-1), axis=3)
+
+        # heatmaps = K.eval(heatmaps)
+        # points = K.eval(points)
+        # fg_gt = np.expand_dims(self._points_to_2d(points), axis=3)  # the result should be [bs, 56,56,1]
+        # heatmaps_gr = np.expand_dims(np.sum(heatmaps, axis=-1), axis=3)
+        # return np.subtract(heatmaps_gr, fg_gt)
+
     def _prepare_hm_discriminator_model_input(self, heatmaps_gr, heatmaps_pr, points_gr, points_pr, img, index):
         """
         at the first step, we fuse concat heatmaps + 2d_points.Then create real/fake labels
@@ -383,7 +376,8 @@ class FacialGAN:
                                                                           InputDataSize.image_input_size,
                                                                           InputDataSize.img_center,
                                                                           InputDataSize.img_center)
-            hm_multi_layer = tf_rec.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, np.array(_x_y), self.hm_stride/2, False)
+            hm_multi_layer = tf_rec.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, np.array(_x_y),
+                                                self.hm_stride / 2, False)
             hm = np.sum(hm_multi_layer, axis=2)
             hm_arr.append(hm)
         return np.array(hm_arr)
@@ -440,7 +434,6 @@ class FacialGAN:
         :return:
         """
         return Lambda(lambda x: tf.expand_dims(tf.math.reduce_sum(x, axis=3), axis=3))(hm_tensor)
-
 
         # hm_tensor_t = tf.expand_dims(tf.math.reduce_sum(hm_tensor, axis=3), axis=3))
 
@@ -603,7 +596,8 @@ class FacialGAN:
         return sep_1_d_cord
 
     def _get_optimizer(self, lr=1e-2, beta_1=0.9, beta_2=0.999, decay=1e-5):
-        return adam(lr=lr, beta_1=beta_1, beta_2=beta_2, decay=decay)
+        return tf.keras.optimizers.Adam(lr=lr, beta_1=beta_1, beta_2=beta_2, decay=decay)
+        # return adam(lr=lr, beta_1=beta_1, beta_2=beta_2, decay=decay)
 
     def _get_batch_sample(self, batch_index, x_train_filenames, y_train_filenames):
         img_path = self.train_images_dir

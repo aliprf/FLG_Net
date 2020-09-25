@@ -15,7 +15,7 @@ file_names/*
 venv/*
 env_3/*
 logs/*
-
+training_checkpoints/*
 .idea/*
 *.png
 *.h5

@@ -78,5 +78,6 @@ if __name__ == '__main__':
                    input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
                    input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
                    input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 1],
-                   input_shape_cord_disc=[IbugConf.num_of_landmarks])
-    fg.train_network()
+                   input_shape_cord_disc=IbugConf.num_of_landmarks*2)
+    fg.train()
+    # fg.train_network()
