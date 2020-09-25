@@ -10,9 +10,6 @@ from test import Test
 from Facial_GAN import FacialGAN
 # from Hm_Cord_Facial_GAN import HmCordFacialGAN
 
-import tensorflow as tf
-import keras
-import keras.backend as K
 
 if __name__ == '__main__':
     pca_utility = PCAUtility()

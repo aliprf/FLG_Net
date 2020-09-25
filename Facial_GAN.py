@@ -3,27 +3,23 @@ from tf_record_utility import TFRecordUtility
 from cnn_model import CNNModel
 from custom_Losses import Custom_losses
 import tensorflow as tf
-import keras
-import keras.backend as K
-from keras.optimizers import adam
-from keras.layers import Input, Lambda
+import tensorflow.keras as keras
+from tensorflow.keras.layers import Input, Lambda
 
 import numpy as np
-from datetime import datetime
 from sklearn.utils import shuffle
 import os
 from sklearn.model_selection import train_test_split
 from numpy import save, load
 import os.path
-from keras import losses
 import csv
 from skimage.io import imread
-from keras.models import Model
-from keras.utils import plot_model
 import itertools
 from skimage.transform import resize
 from image_utility import ImageUtility
 import img_printer as imgpr
+
+print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
 
 tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -169,7 +165,7 @@ class FacialGAN:
             hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm)
             cord_reg_loss = self.generator_loss(real_output=points_gr, fake_output=points_pr)
             cord_disc_loss = self.discriminator_loss(real_output=real_pts, fake_output=fake_pts)
-            # print("Training loss (for one batch) at epoch %d ->step %d IS %.4f" % (epoch, step, float(hm_reg_loss)))
+            tf.print("Training loss (for one batch) at epoch %d ->step %d IS %.4f" % (epoch, step, float(hm_reg_loss)))
 
         print('Gradient process start:')
         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
@@ -197,24 +193,22 @@ class FacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
-        for epoch in range(LearningConfig.epochs):
-            for batch_index in range(step_per_epoch):
-                self._create_ckpt(epoch, hm_reg_optimizer, cord_reg_optimizer, hm_disc_optimizer, cord_disc_optimizer,
-                                  hm_reg_model, cord_reg_model, hm_disc_model, cord_disc_model)
-                images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
-                self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
-                                hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
-                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
-                                cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
-                print('batch_index: ' + str(batch_index))
-            # Save the model every 2 epochs
-            if (epoch + 1) % 2 == 0:
-                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
-                                  cord_generator_optimizer=cord_reg_optimizer,
-                                  hm_discriminator_optimizer=hm_disc_optimizer,
-                                  cord_discriminator_optimizer=cord_disc_optimizer,
-                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
-                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
+        with tf.device('gpu:2'):
+            for epoch in range(LearningConfig.epochs):
+                for batch_index in range(step_per_epoch):
+                    images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                    self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
+                                    hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
+                                    hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                                    cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
+                    print('batch_index: ' + str(batch_index))
+                if (epoch + 1) % 2 == 0:
+                    self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+                                      cord_generator_optimizer=cord_reg_optimizer,
+                                      hm_discriminator_optimizer=hm_disc_optimizer,
+                                      cord_discriminator_optimizer=cord_disc_optimizer,
+                                      hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+                                      hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
     # -----------------------------------------------------
 
