@@ -28,7 +28,7 @@ class FacialGAN:
                  cord_discriminator_arch, hm_regressor_weight, cord_regressor_weight, hm_discriminator_weight,
                  cord_discriminator_weight, input_shape_hm_reg, input_shape_cord_reg, input_shape_hm_disc,
                  input_shape_cord_disc):
-        tf.executing_eagerly()
+        # tf.executing_eagerly()
 
         self.dataset_name = dataset_name
         self.hm_regressor_arch = hm_regressor_arch
@@ -194,24 +194,24 @@ class FacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
-        # with tf.device('gpu:2'):
-        for epoch in range(LearningConfig.epochs):
-            for batch_index in range(step_per_epoch):
-                print('batch_index: ' + str(batch_index))
-                images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
-                self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
-                                hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
-                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
-                                cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
-            if (epoch + 1) % 2 == 0:
-                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
-                                  cord_generator_optimizer=cord_reg_optimizer,
-                                  hm_discriminator_optimizer=hm_disc_optimizer,
-                                  cord_discriminator_optimizer=cord_disc_optimizer,
-                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
-                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
+        with tf.device('gpu:0'):
+            for epoch in range(LearningConfig.epochs):
+                for batch_index in range(step_per_epoch):
+                    print('batch_index: ' + str(batch_index))
+                    images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                    self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
+                                    hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
+                                    hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                                    cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
+                if (epoch + 1) % 2 == 0:
+                    self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+                                      cord_generator_optimizer=cord_reg_optimizer,
+                                      hm_discriminator_optimizer=hm_disc_optimizer,
+                                      cord_discriminator_optimizer=cord_disc_optimizer,
+                                      hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+                                      hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
-    # -----------------------------------------------------
+        # -----------------------------------------------------
 
     def _create_cord_regressor_net(self, input_tensor, input_shape, is_trainable=True):
         """
