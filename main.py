@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks * 2)
+    # tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks * 2)
     # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
     # # # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
     # # '''     normalize the points and save'''

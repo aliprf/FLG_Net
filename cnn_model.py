@@ -3,13 +3,12 @@ from configuration import DatasetName, DatasetType, \
 from hg_Class import HourglassNet
 
 import tensorflow as tf
-import tensorflow.keras as keras
 from tensorflow.keras import backend as K
 
-# import keras
+# import tf.keras
 from skimage.transform import resize
 
-from keras.regularizers import l2, l1
+from tensorflow.keras.regularizers import l2, l1
 
 # tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -18,26 +17,25 @@ from tensorflow.keras.applications import mobilenet_v2, mobilenet, resnet50, den
 from tensorflow.keras.layers import Dense, MaxPooling2D, Conv2D, Flatten, Conv2DTranspose, BatchNormalization,\
     Activation, GlobalAveragePooling2D, DepthwiseConv2D, Dropout, ReLU, Concatenate, Input, GlobalMaxPool2D
 
-from keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import ModelCheckpoint
 
-from keras.optimizers import adam
+from tensorflow.keras.optimizers import Adam
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-from keras.callbacks import CSVLogger
+from tensorflow.keras.callbacks import CSVLogger
 from clr_callback import CyclicLR
 from datetime import datetime
 
 import cv2
 import os.path
-from keras.utils.vis_utils import plot_model
 from scipy.spatial import distance
 import scipy.io as sio
-from keras.engine import InputLayer
+# from keras.engine import InputLayer
 # import coremltools
 
-# import efficientnet.keras as efn
 import efficientnet.tfkeras as efn
+# import efficientnet.keras as efn
 
 
 class CNNModel:
@@ -116,19 +114,19 @@ class CNNModel:
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv1', kernel_initializer='he_uniform')(x)  # 14, 14, 256
         x = BatchNormalization()(x)
-        x = keras.layers.add([x, bn_2])  # 14, 14, 256
+        x = tf.keras.layers.add([x, bn_2])  # 14, 14, 256
         x = ReLU()(x)
 
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv2', kernel_initializer='he_uniform')(x)  # 28, 28, 256
         x = BatchNormalization()(x)
-        x = keras.layers.add([x, bn_1])  # 28, 28, 256
+        x = tf.keras.layers.add([x, bn_1])  # 28, 28, 256
         x = ReLU()(x)
 
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv3', kernel_initializer='he_uniform')(x)  # 56, 56, 256
         x = BatchNormalization()(x)
-        x = keras.layers.add([x, bn_0])  # 56, 56, 256
+        x = tf.keras.layers.add([x, bn_0])  # 56, 56, 256
 
         '''out heatmap regression'''
         out_heatmap = Conv2D(num_landmark//2, kernel_size=1, padding='same', name='O_hm')(x)
@@ -176,14 +174,14 @@ class CNNModel:
 
     def create_cord_disc_model(self, input_shape, input_tensor):
 
-        inputs = inputs = keras.Input(shape=(input_shape,))
+        inputs = inputs = tf.keras.Input(shape=(input_shape,))
         x = Dense(128, activation="relu")(inputs)
         x = Dense(128, activation="relu")(x)
         x = Dense(128, activation="relu")(x)
         x = Dropout(.5)(x)
         outputs = Dense(1)(x)
 
-        model = keras.Model(inputs=inputs, outputs=outputs, name="cord_disc_model")
+        model = tf.keras.Model(inputs=inputs, outputs=outputs, name="cord_disc_model")
         model.summary()
 
         # model_json = model.to_json()
@@ -232,7 +230,7 @@ class CNNModel:
         return eff_net
 
     def create_resnetDiscrimNet(self, input_shape, input_tensor):
-        eff_net = keras.applications.resnet.ResNet50(include_top=True, weights=None, input_tensor=input_tensor,
+        eff_net = tf.keras.applications.resnet.ResNet50(include_top=True, weights=None, input_tensor=input_tensor,
                                                      input_shape=input_shape, pooling=None, classes=1)
         eff_net.summary()
         model_json = eff_net.to_json()
@@ -280,14 +278,14 @@ class CNNModel:
     def calculate_flops(self, _arch, _output_len):
 
         if _arch == 'ASMNet':
-            net = keras.models.load_model('./final_weights/wflw_ds_.h5', compile=False)
+            net = tf.keras.models.load_model('./final_weights/wflw_ds_.h5', compile=False)
         elif _arch == 'mobileNetV2':
-            net = keras.models.load_model('./final_weights/wflw_mn_.h5', compile=False)
+            net = tf.keras.models.load_model('./final_weights/wflw_mn_.h5', compile=False)
         net._layers[0].batch_input_shape = (1, 224, 224, 3)
 
         with tf.Session(graph=tf.Graph()) as sess:
             K.set_session(sess)
-            model_new = keras.models.model_from_json(net.to_json())
+            model_new = tf.keras.models.model_from_json(net.to_json())
             model_new.summary()
 
             #     x = net.get_layer('O_L').output  # 1280
@@ -295,11 +293,11 @@ class CNNModel:
             #     revised_model = Model(inp, [x])
             #     revised_model.build(tf.placeholder('float32', shape=(1, 448, 448, 3)))
             #     revised_model.summary()
-            #     net = tf.keras.models.load_model('./final_weights/ibug_ds_asm.h5')
+            #     net = tf.tf.keras.models.load_model('./final_weights/ibug_ds_asm.h5')
             #     net = self.create_ASMNet(inp_tensor=None, inp_shape=(224, 224, 3), output_len=_output_len)
             #     net = self.create_ASMNet(inp_tensor=tf.placeholder('float32', shape=(1, 224, 224, 3)), inp_shape=None, output_len=_output_len)
             # elif _arch == 'mobileNetV2':
-            #     # net = tf.keras.models.load_model('./final_weights/ibug_mn_.h5')
+            #     # net = tf.tf.keras.models.load_model('./final_weights/ibug_mn_.h5')
             #
             #     # net = self.create_MobileNet(inp_tensor=None, inp_shape=(224, 224, 3), output_len=_output_len)
             #     # net = resnet50.ResNet50(input_shape=(224, 224, 3),  weights=None)

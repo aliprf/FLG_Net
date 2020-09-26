@@ -3,7 +3,6 @@ from tf_record_utility import TFRecordUtility
 from cnn_model import CNNModel
 from custom_Losses import Custom_losses
 import tensorflow as tf
-import tensorflow.keras as keras
 from tensorflow.keras.layers import Input, Lambda
 
 import numpy as np
@@ -29,6 +28,7 @@ class FacialGAN:
                  cord_discriminator_arch, hm_regressor_weight, cord_regressor_weight, hm_discriminator_weight,
                  cord_discriminator_weight, input_shape_hm_reg, input_shape_cord_reg, input_shape_hm_disc,
                  input_shape_cord_disc):
+        tf.executing_eagerly()
 
         self.dataset_name = dataset_name
         self.hm_regressor_arch = hm_regressor_arch
@@ -165,14 +165,15 @@ class FacialGAN:
             hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm)
             cord_reg_loss = self.generator_loss(real_output=points_gr, fake_output=points_pr)
             cord_disc_loss = self.discriminator_loss(real_output=real_pts, fake_output=fake_pts)
-            tf.print("Training loss (for one batch) IS " + hm_reg_loss)
+            tf.print("Training loss (for one batch) IS :" )
+            tf.print(hm_reg_loss)
 
-        print('Gradient process start:')
+        tf.print('Gradient process start:')
         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
         gradients_of_hm_disc = hm_disc_tape.gradient(hm_disc_loss, hm_disc_model.trainable_variables)
         gradients_of_cord_reg = cord_reg_tape.gradient(cord_reg_loss, cord_reg_model.trainable_variables)
         gradients_of_cord_disc = cord_disc_tape.gradient(cord_disc_loss, cord_disc_model.trainable_variables)
-        print('apply_gradients start:')
+        tf.print('apply_gradients start:')
         hm_reg_optimizer.apply_gradients(zip(gradients_of_hm_reg, hm_reg_model.trainable_variables))
         hm_disc_optimizer.apply_gradients(zip(gradients_of_hm_disc, hm_disc_model.trainable_variables))
         cord_reg_optimizer.apply_gradients(zip(gradients_of_cord_reg, cord_reg_model.trainable_variables))
@@ -193,22 +194,22 @@ class FacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
-        with tf.device('gpu:2'):
-            for epoch in range(LearningConfig.epochs):
-                for batch_index in range(step_per_epoch):
-                    images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
-                    self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
-                                    hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
-                                    hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
-                                    cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
-                    print('batch_index: ' + str(batch_index))
-                if (epoch + 1) % 2 == 0:
-                    self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
-                                      cord_generator_optimizer=cord_reg_optimizer,
-                                      hm_discriminator_optimizer=hm_disc_optimizer,
-                                      cord_discriminator_optimizer=cord_disc_optimizer,
-                                      hm_generator=hm_reg_model, cord_generator=cord_reg_model,
-                                      hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
+        # with tf.device('gpu:2'):
+        for epoch in range(LearningConfig.epochs):
+            for batch_index in range(step_per_epoch):
+                print('batch_index: ' + str(batch_index))
+                images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
+                                hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
+                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                                cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
+            if (epoch + 1) % 2 == 0:
+                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+                                  cord_generator_optimizer=cord_reg_optimizer,
+                                  hm_discriminator_optimizer=hm_disc_optimizer,
+                                  cord_discriminator_optimizer=cord_disc_optimizer,
+                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
     # -----------------------------------------------------
 
@@ -229,7 +230,7 @@ class FacialGAN:
         if self.cord_regressor_weight is not None:
             model.load_weights(self.cord_regressor_weight)
         model.trainable = is_trainable
-        model.compile(loss=keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
+        model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
         return model
 
     def _create_hm_regressor_net(self, input_tensor, input_shape, is_trainable=True):
@@ -251,7 +252,7 @@ class FacialGAN:
 
         model.trainable = is_trainable
 
-        model.compile(loss=keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
+        model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=self._get_optimizer(), metrics=['mse'])
         return model
 
     def _create_hm_discriminator_net(self, input_tensor, input_shape, is_trainable=True):
