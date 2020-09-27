@@ -74,6 +74,7 @@ class FacialGAN:
             self.hm_stride = WflwConf.hm_stride
 
         gpus = tf.config.experimental.list_physical_devices('GPU')
+        assert (gpus)
         if gpus:
             try:
                 # Currently, memory growth needs to be the same across GPUs
