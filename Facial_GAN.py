@@ -18,8 +18,9 @@ from skimage.transform import resize
 from image_utility import ImageUtility
 import img_printer as imgpr
 
-print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
 
+tf.config.set_soft_device_placement(True)
+print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
 tf.debugging.set_log_device_placement(True)
 
 
@@ -194,22 +195,22 @@ class FacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
-        with tf.device('/device:GPU:0'):
-            for epoch in range(LearningConfig.epochs):
-                for batch_index in range(step_per_epoch):
-                    print('batch_index: ' + str(batch_index))
-                    images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
-                    self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
-                                    hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
-                                    hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
-                                    cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
-                if (epoch + 1) % 2 == 0:
-                    self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
-                                      cord_generator_optimizer=cord_reg_optimizer,
-                                      hm_discriminator_optimizer=hm_disc_optimizer,
-                                      cord_discriminator_optimizer=cord_disc_optimizer,
-                                      hm_generator=hm_reg_model, cord_generator=cord_reg_model,
-                                      hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
+        # with tf.device('/GPU:0'):
+        for epoch in range(LearningConfig.epochs):
+            for batch_index in range(step_per_epoch):
+                print('batch_index: ' + str(batch_index))
+                images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames, y_train_filenames)
+                self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr, points_gr=points_gr, hm_reg_model=hm_reg_model,
+                                hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model, cord_disc_model=cord_disc_model,
+                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                                cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
+            if (epoch + 1) % 2 == 0:
+                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+                                  cord_generator_optimizer=cord_reg_optimizer,
+                                  hm_discriminator_optimizer=hm_disc_optimizer,
+                                  cord_discriminator_optimizer=cord_disc_optimizer,
+                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
         # -----------------------------------------------------
 
