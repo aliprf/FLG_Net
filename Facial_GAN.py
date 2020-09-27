@@ -21,7 +21,7 @@ import img_printer as imgpr
 
 tf.config.set_soft_device_placement(True)
 print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
-tf.debugging.set_log_device_placement(True)
+# tf.debugging.set_log_device_placement(True)
 
 
 class FacialGAN:
@@ -72,6 +72,19 @@ class FacialGAN:
             self.train_point_dir = WflwConf.normalized_points_npy_dir
             self.num_face_graph_elements = WflwConf.num_face_graph_elements
             self.hm_stride = WflwConf.hm_stride
+
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            try:
+                # Currently, memory growth needs to be the same across GPUs
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+                print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            except RuntimeError as e:
+                print("NO GPU!!!!")
+
+
 
     def make_hm_generator_model(self):
         cnn = CNNModel()
