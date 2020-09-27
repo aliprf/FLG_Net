@@ -20,7 +20,7 @@ import img_printer as imgpr
 
 print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
 
-# tf.debugging.set_log_device_placement(True)
+tf.debugging.set_log_device_placement(True)
 
 
 class FacialGAN:
@@ -194,7 +194,7 @@ class FacialGAN:
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
-        with tf.device('gpu:0'):
+        with tf.device('/device:GPU:0'):
             for epoch in range(LearningConfig.epochs):
                 for batch_index in range(step_per_epoch):
                     print('batch_index: ' + str(batch_index))
