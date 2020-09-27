@@ -4,10 +4,12 @@
 #torch
 #torchvision
 bottleneck
-tensorflow==1.14.0
+numpy==1.19.0
+#tensorflow==1.14.0
+tensorflow==2.3.1
 #tensorflow-gpu==1.14
-keras==2.2.4
-numpy
+# keras==2.2.4
+keras==2.4.3
 matplotlib
 opencv-python
 opencv-contrib-python

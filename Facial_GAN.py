@@ -20,7 +20,7 @@ import img_printer as imgpr
 
 print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
 
-tf.logging.set_verbosity(tf.logging.ERROR)
+# tf.debugging.set_log_device_placement(True)
 
 
 class FacialGAN:

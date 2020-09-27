@@ -26,9 +26,6 @@ from image_utility import ImageUtility
 import img_printer as imgpr
 
 
-tf.logging.set_verbosity(tf.logging.ERROR)
-
-
 class FacialGAN:
     def __init__(self, dataset_name, geo_custom_loss, regressor_arch,
                  discriminator_arch, regressor_weight, discriminator_weight, input_shape_reg, input_shape_disc):

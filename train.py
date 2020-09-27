@@ -11,10 +11,8 @@ import keras
 # print(tf.__version__)
 # print(keras.__version__)
 
-tf.logging.set_verbosity(tf.logging.ERROR)
 from keras.callbacks import ModelCheckpoint
 
-from keras.optimizers import adam
 import numpy as np
 import matplotlib.pyplot as plt
 import math
