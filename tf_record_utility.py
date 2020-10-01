@@ -9,7 +9,6 @@ import csv
 import sys
 from PIL import Image
 from pathlib import Path
-import sqlite3
 import cv2
 import os.path
 from keras import backend as K
