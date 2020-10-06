@@ -4,7 +4,7 @@
 #torch
 #torchvision
 bottleneck
-numpy==1.19.0
+numpy==1.19.2
 #tensorflow==1.14.0
 tensorflow==2.3.1
 #tensorflow-gpu==1.14
