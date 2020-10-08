@@ -78,6 +78,6 @@ if __name__ == '__main__':
                    input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
 
                    input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2], # we concat flatten hm and img
-                   input_shape_cord_disc=[IbugConf.num_of_landmarks*2, 2]) # concat 2 generated and real array
+                   input_shape_cord_disc=[IbugConf.num_of_landmarks*2]) # concat 2 generated and real array
     fg.train()
     # fg.train_network()
