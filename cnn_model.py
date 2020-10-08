@@ -1,21 +1,12 @@
 from configuration import DatasetName, DatasetType, \
     AffectnetConf, IbugConf, W300Conf, InputDataSize, LearningConfig
 from hg_Class import HourglassNet
-
 import tensorflow as tf
 from tensorflow.keras import backend as K
-
-# import tf.keras
-from skimage.transform import resize
-
-from tensorflow.keras.regularizers import l2, l1
-
-# tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications import mobilenet_v2, mobilenet, resnet50, densenet
-from tensorflow.keras.layers import Dense, MaxPooling2D, Conv2D, Flatten, Conv2DTranspose, BatchNormalization,\
-    Activation, GlobalAveragePooling2D, DepthwiseConv2D, Dropout, ReLU, Concatenate, Input, GlobalMaxPool2D
+from tensorflow.keras.layers import Dense, MaxPooling2D, Conv2D, Flatten, Conv2DTranspose, BatchNormalization, \
+    Activation, GlobalAveragePooling2D, DepthwiseConv2D, Dropout, ReLU, Concatenate, Input, GlobalMaxPool2D, LeakyReLU
 
 from tensorflow.keras.callbacks import ModelCheckpoint
 
@@ -35,7 +26,11 @@ import scipy.io as sio
 # import coremltools
 
 import efficientnet.tfkeras as efn
+
+
 # import efficientnet.keras as efn
+
+# from tfkerassurgeon.operations import delete_layer, insert_layer
 
 
 class CNNModel:
@@ -48,14 +43,15 @@ class CNNModel:
             model = self.create_effDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
 
         elif arch == 'hm_reg_model':
-            model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
+            model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor,
+                                             num_landmark=num_landmark)
         elif arch == 'cord_reg_model':
-            model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor, num_landmark=num_landmark)
+            model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor,
+                                               num_landmark=num_landmark)
         elif arch == 'hm_Disc_model':
             model = self.create_hm_disc_model(input_shape=input_shape, input_tensor=input_tensor)
         elif arch == 'cord_Disc_model':
             model = self.create_cord_disc_model(input_shape=input_shape, input_tensor=input_tensor)
-
 
         return model
 
@@ -82,54 +78,63 @@ class CNNModel:
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             kernel_initializer='he_uniform')(top_activation)  # 14, 14, 256
         x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
         x = ReLU()(x)
 
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             kernel_initializer='he_uniform')(x)  # 28, 28, 256
         x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
         x = ReLU()(x)
 
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             kernel_initializer='he_uniform')(x)  # 56, 56, 256
         bn_0 = BatchNormalization(name='bn_0')(x)
+        x = Dropout(0.5)(x)
         x = ReLU()(bn_0)
 
         '''reduce to  7'''
         x = Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding='same', kernel_initializer='he_uniform')(
             x)  # 28, 28, 256
         bn_1 = BatchNormalization(name='bn_1')(x)  # 28, 28, 256
+        x = Dropout(0.5)(x)
         x = ReLU()(bn_1)
 
         x = Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding='same', kernel_initializer='he_uniform')(
             x)  # 14, 14, 256
         bn_2 = BatchNormalization(name='bn_2')(x)  # 14, 14, 256
+        x = Dropout(0.5)(x)
         x = ReLU()(bn_2)
 
         x = Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding='same', kernel_initializer='he_uniform')(
             x)  # 7, 7 , 256
         bn_3 = BatchNormalization(name='bn_3')(x)  # 7, 7 , 256
+        x = Dropout(0.5)(x)
         x = ReLU()(bn_3)
 
         '''increase to  56'''
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv1', kernel_initializer='he_uniform')(x)  # 14, 14, 256
         x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
         x = tf.keras.layers.add([x, bn_2])  # 14, 14, 256
         x = ReLU()(x)
 
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv2', kernel_initializer='he_uniform')(x)  # 28, 28, 256
         x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
         x = tf.keras.layers.add([x, bn_1])  # 28, 28, 256
         x = ReLU()(x)
 
         x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
                             name='deconv3', kernel_initializer='he_uniform')(x)  # 56, 56, 256
         x = BatchNormalization()(x)
+        x = Dropout(0.5)(x)
         x = tf.keras.layers.add([x, bn_0])  # 56, 56, 256
 
         '''out heatmap regression'''
-        out_heatmap = Conv2D(num_landmark//2, kernel_size=1, padding='same', name='O_hm')(x)
+        out_heatmap = Conv2D(num_landmark // 2, kernel_size=1, padding='same', name='O_hm')(x)
         eff_net = Model(inp, [out_heatmap])
         eff_net.summary()
 
@@ -189,7 +194,6 @@ class CNNModel:
         #     json_file.write(model_json)
         return model
 
-
     def create_hm_disc_model(self, input_shape, input_tensor):
         """
         This is EfficientNet-B7 used as a binary classifier network.
@@ -197,17 +201,77 @@ class CNNModel:
         :param input_tensor:
         :return: model
         """
-        eff_net = efn.EfficientNetB0(include_top=True,
-                                     weights=None,
-                                     input_tensor=input_tensor,
-                                     input_shape=input_shape,
-                                     pooling=None,
-                                     classes=1)
-        eff_net.summary()
-        model_json = eff_net.to_json()
+        initializer = tf.random_normal_initializer(0., 0.02)
+
+        imgInput = Input(shape=(224, 224, 3))
+        img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
+        hmInput = Input(shape=(56, 56, 1))
+        x = tf.keras.layers.concatenate([hmInput, img_resized])
+        x = self.downsample(64, 4, 1, False)(x)
+        x = self.downsample(64, 4, 1)(x)
+        x = self.downsample(64, 4, 2)(x)
+
+        x = self.downsample(128, 4, 1)(x)
+        x = self.downsample(128, 4, 2)(x)
+
+        x = self.downsample(256, 4, 1)(x)
+        x = self.downsample(256, 4, 2)(x)
+
+        x = self.downsample(512, 4, 1)(x)
+        x = self.downsample(512, 4, 2)(x)
+
+        x = self.downsample(1024, 4, 2)(x)
+
+        x = Dropout(0.3)(x)
+        x = Flatten()(x)
+        last = Dense(1)(x)
+
+        model = tf.keras.Model(inputs=[imgInput, hmInput], outputs=last)
+        model.summary()
+        model_json = model.to_json()
         with open("./model_arch/Disc_hm_model.json", "w") as json_file:
             json_file.write(model_json)
-        return eff_net
+        return model
+
+        # top_activation = eff_net.get_layer('top_activation').output
+        # '''out for geo regression'''
+        # x = GlobalAveragePooling2D()(top_activation)
+        # x = Dropout(0.5)(x)
+        # out_geo = Dense(2, name='O_hm_disc')(x)
+        # eff_net = Model(newOutputs, out_geo)
+
+        # eff_net.summary()
+        # model_json = eff_net.to_json()
+        # with open("./model_arch/Disc_hm_model.json", "w") as json_file:
+        #     json_file.write(model_json)
+        # return eff_net
+
+        # eff_net = efn.EfficientNetB0(include_top=True,
+        #                              weights=None,
+        #                              input_tensor=input_tensor,
+        #                              input_shape=input_shape,
+        #                              pooling=None,
+        #                              classes=1)
+        # eff_net.summary()
+        # model_json = eff_net.to_json()
+        # with open("./model_arch/Disc_hm_model.json", "w") as json_file:
+        #     json_file.write(model_json)
+        # return eff_net
+
+    def downsample(self, filters, size, strides=2, apply_batchnorm=True):
+        initializer = tf.random_normal_initializer(0., 0.02)
+
+        result = tf.keras.Sequential()
+        result.add(
+            tf.keras.layers.Conv2D(filters, size, strides=strides, padding='same',
+                                   kernel_initializer=initializer, use_bias=False))
+
+        if apply_batchnorm:
+            result.add(tf.keras.layers.BatchNormalization())
+
+        result.add(tf.keras.layers.LeakyReLU())
+
+        return result
 
     def create_effNet(self, input_shape, input_tensor, num_landmark):
         """
@@ -231,7 +295,7 @@ class CNNModel:
 
     def create_resnetDiscrimNet(self, input_shape, input_tensor):
         eff_net = tf.keras.applications.resnet.ResNet50(include_top=True, weights=None, input_tensor=input_tensor,
-                                                     input_shape=input_shape, pooling=None, classes=1)
+                                                        input_shape=input_shape, pooling=None, classes=1)
         eff_net.summary()
         model_json = eff_net.to_json()
         with open("effDiscrimNet.json", "w") as json_file:

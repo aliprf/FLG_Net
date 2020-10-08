@@ -123,17 +123,17 @@ class FacialGAN:
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
         total_loss = real_loss + fake_loss
-        tf.print( loss_type, "-DIDC->ep: ", str(epoch), " ind: ", str(b_index), 'rl:{ ', real_loss, '} fl:{', fake_loss,
-                  '} lT:{', total_loss,'}')
+        tf.print(loss_type, "-DIDC->ep: ", str(epoch), " ind: ", str(b_index), 'rl:{ ', real_loss, '} fl:{', fake_loss,
+                 '} lT:{', total_loss, '}')
         return total_loss
 
-    def generator_loss(self, real_output, fake_output, loss_type, epoch, b_index):
+    def regressor_loss(self, real_output, fake_output, loss_type, epoch, b_index):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        loss_gen = tf.reduce_mean(tf.abs(real_output - fake_output))
+        loss_reg = tf.reduce_mean(tf.abs(real_output - fake_output))
         loss_disc = cross_entropy(tf.ones_like(fake_output), fake_output)
-        loss_total = 10 * loss_gen + loss_disc
+        loss_total = 100 * loss_reg + loss_disc
         tf.print(loss_type, "-REG->ep: ", str(epoch), "->ind: ", str(b_index),
-                 'lg:{ ', loss_gen, '} ld:{', loss_disc, 'lT:{', loss_total,'}')
+                 'lg:{ ', loss_reg, '} ld:{', loss_disc, 'lT:{', loss_total, '}')
         return loss_total
 
     def _create_ckpt(self, epoch, hm_generator_optimizer, cord_generator_optimizer, hm_discriminator_optimizer,
@@ -156,80 +156,115 @@ class FacialGAN:
         cord_discriminator.save_weights(checkpoint_dir + 'cord_disc_' + str(epoch) + '_.h5')
 
     # @tf.function
-    def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model, cord_reg_model,
-                   cord_disc_model,
-                   hm_reg_optimizer, hm_disc_optimizer, cord_reg_optimizer, cord_disc_optimizer):
+    def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model,
+                   hm_reg_optimizer, hm_disc_optimizer):
 
-        with tf.GradientTape() as hm_reg_tape, tf.GradientTape() as hm_disc_tape \
-                , tf.GradientTape() as cord_reg_tape, tf.GradientTape() as cord_disc_tape:
+        with tf.GradientTape() as hm_reg_tape, tf.GradientTape() as hm_disc_tape, tf.GradientTape():
             '''prediction'''
             heatmaps_pr = hm_reg_model(images)
-            points_pr = cord_reg_model(images)
+
             '''hm GAN'''
-            fused_heatmaps_gr = self.fuse_hm(heatmaps_gr, points_gr)
-            fused_heatmaps_pr = self.fuse_hm(heatmaps_pr, points_pr)
-            real_hm = hm_disc_model(fused_heatmaps_gr)
-            fake_hm = hm_disc_model(fused_heatmaps_pr)
-            '''cord GAN'''
-            fake_pts = cord_disc_model(points_pr)
-            real_pts = cord_disc_model(points_gr)
+            '''     flatten both heatmaps'''
+            flat_heatmaps_gr = self.flatten_hm(heatmaps_gr, 'real'+str(epoch)+str(step))
+            flat_heatmaps_pr = self.flatten_hm(heatmaps_pr, 'fake'+str(epoch)+str(step))
+            '''create'''
+            real_hm = hm_disc_model([images, flat_heatmaps_gr])
+            fake_hm = hm_disc_model([images, flat_heatmaps_pr])
+
             '''loss calculation'''
-            hm_reg_loss = self.generator_loss(real_output=heatmaps_gr, fake_output=heatmaps_pr, loss_type='hm',
+            hm_reg_loss = self.regressor_loss(real_output=heatmaps_gr, fake_output=heatmaps_pr, loss_type='hm',
                                               epoch=epoch, b_index=step)
             hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm, loss_type='hm',
                                                    epoch=epoch, b_index=step)
-            cord_reg_loss = self.generator_loss(real_output=points_gr, fake_output=points_pr, loss_type='cord',
-                                                epoch=epoch, b_index=step)
-            cord_disc_loss = self.discriminator_loss(real_output=real_pts, fake_output=fake_pts, loss_type='cord',
-                                                     epoch=epoch, b_index=step)
-
         ''' Calculate: Gradients'''
         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
         gradients_of_hm_disc = hm_disc_tape.gradient(hm_disc_loss, hm_disc_model.trainable_variables)
-        gradients_of_cord_reg = cord_reg_tape.gradient(cord_reg_loss, cord_reg_model.trainable_variables)
-        gradients_of_cord_disc = cord_disc_tape.gradient(cord_disc_loss, cord_disc_model.trainable_variables)
         '''apply Gradients:'''
         hm_reg_optimizer.apply_gradients(zip(gradients_of_hm_reg, hm_reg_model.trainable_variables))
         hm_disc_optimizer.apply_gradients(zip(gradients_of_hm_disc, hm_disc_model.trainable_variables))
-        cord_reg_optimizer.apply_gradients(zip(gradients_of_cord_reg, cord_reg_model.trainable_variables))
-        cord_disc_optimizer.apply_gradients(zip(gradients_of_cord_disc, cord_disc_model.trainable_variables))
+
+    # def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model, cord_reg_model,
+    #              cord_disc_model,
+    #                    hm_reg_optimizer, hm_disc_optimizer, cord_reg_optimizer, cord_disc_optimizer):
+    #
+    #         with tf.GradientTape() as hm_reg_tape, tf.GradientTape() as hm_disc_tape \
+    #                 , tf.GradientTape() as cord_reg_tape, tf.GradientTape() as cord_disc_tape:
+    #             '''prediction'''
+    #             heatmaps_pr = hm_reg_model(images)
+    #             points_pr = cord_reg_model(images)
+    #
+    #             '''hm GAN'''
+    #             '''     flatten both heatmaps'''
+    #             flat_heatmaps_gr = self.flatten_hm(heatmaps_gr)
+    #             flat_heatmaps_pr = self.flatten_hm(heatmaps_pr)
+    #             '''create'''
+    #             real_hm = hm_disc_model(flat_heatmaps_gr)
+    #             fake_hm = hm_disc_model(flat_heatmaps_pr)
+    #             '''cord GAN'''
+    #             fake_pts = cord_disc_model(points_pr)
+    #             real_pts = cord_disc_model(points_gr)
+    #             '''loss calculation'''
+    #             hm_reg_loss = self.regressor_loss(real_output=heatmaps_gr, fake_output=heatmaps_pr, loss_type='hm',
+    #                                               epoch=epoch, b_index=step)
+    #             hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm, loss_type='hm',
+    #                                                    epoch=epoch, b_index=step)
+    #             cord_reg_loss = self.regressor_loss(real_output=points_gr, fake_output=points_pr, loss_type='cord',
+    #                                                 epoch=epoch, b_index=step)
+    #             cord_disc_loss = self.discriminator_loss(real_output=real_pts, fake_output=fake_pts, loss_type='cord',
+    #                                                      epoch=epoch, b_index=step)
+    #
+    #         ''' Calculate: Gradients'''
+    #         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
+    #         gradients_of_hm_disc = hm_disc_tape.gradient(hm_disc_loss, hm_disc_model.trainable_variables)
+    #         gradients_of_cord_reg = cord_reg_tape.gradient(cord_reg_loss, cord_reg_model.trainable_variables)
+    #         gradients_of_cord_disc = cord_disc_tape.gradient(cord_disc_loss, cord_disc_model.trainable_variables)
+    #         '''apply Gradients:'''
+    #         hm_reg_optimizer.apply_gradients(zip(gradients_of_hm_reg, hm_reg_model.trainable_variables))
+    #         hm_disc_optimizer.apply_gradients(zip(gradients_of_hm_disc, hm_disc_model.trainable_variables))
+    #         cord_reg_optimizer.apply_gradients(zip(gradients_of_cord_reg, cord_reg_model.trainable_variables))
+    #         cord_disc_optimizer.apply_gradients(zip(gradients_of_cord_disc, cord_disc_model.trainable_variables))
 
     def train(self):
 
         hm_reg_model = self.make_hm_generator_model()
         hm_disc_model = self.make_hm_discriminator_model()
-        cord_reg_model = self.make_cord_generator_model()
-        cord_disc_model = self.make_cord_discriminator_model()
+        # cord_reg_model = self.make_cord_generator_model()
+        # cord_disc_model = self.make_cord_discriminator_model()
 
         hm_reg_optimizer = self._get_optimizer(lr=1e-2)
         hm_disc_optimizer = self._get_optimizer(lr=1e-2)
-        cord_reg_optimizer = self._get_optimizer(lr=1e-2)
-        cord_disc_optimizer = self._get_optimizer(lr=1e-2)
+        # cord_reg_optimizer = self._get_optimizer(lr=1e-2)
+        # cord_disc_optimizer = self._get_optimizer(lr=1e-2)
 
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
         step_per_epoch = len(x_train_filenames) // LearningConfig.batch_size
-        # with tf.device('/GPU:0'):
+
         for epoch in range(LearningConfig.epochs):
             for batch_index in range(step_per_epoch):
-                # print('epoch: ' + str(epoch) + ' -> batch_index: ' + str(batch_index))
                 images, heatmaps_gr, points_gr = self._get_batch_sample(batch_index, x_train_filenames,
                                                                         y_train_filenames)
+
                 images = tf.cast(images, tf.float32)
                 points_gr = tf.cast(points_gr, tf.float32)
                 self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr,
                                 points_gr=points_gr, hm_reg_model=hm_reg_model,
-                                hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model,
-                                cord_disc_model=cord_disc_model,
-                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
-                                cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
-            if (epoch + 1) % 2 == 0:
-                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
-                                  cord_generator_optimizer=cord_reg_optimizer,
-                                  hm_discriminator_optimizer=hm_disc_optimizer,
-                                  cord_discriminator_optimizer=cord_disc_optimizer,
-                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
-                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
+                                hm_disc_model=hm_disc_model,
+                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer)
+
+                # self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr,
+                #                 points_gr=points_gr, hm_reg_model=hm_reg_model,
+                #                 hm_disc_model=hm_disc_model, cord_reg_model=cord_reg_model,
+                #                 cord_disc_model=cord_disc_model,
+                #                 hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                #                 cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer)
+            # if (epoch + 1) % 2 == 0:
+            #     self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+            #                       cord_generator_optimizer=cord_reg_optimizer,
+            #                       hm_discriminator_optimizer=hm_disc_optimizer,
+            #                       cord_discriminator_optimizer=cord_disc_optimizer,
+            #                       hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+            #                       hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
         # -----------------------------------------------------
 
@@ -313,6 +348,12 @@ class FacialGAN:
                       optimizer=self._get_optimizer(lr=1e-4, decay=1e-6),
                       metrics=['accuracy'])
         return model
+
+    def flatten_hm(self, heatmaps, lbl):
+        result = tf.expand_dims(tf.math.reduce_sum(heatmaps, axis=-1), axis=3)
+        for i in range(LearningConfig.batch_size):
+            imgpr.print_image_arr_heat(lbl + '_' + str(i), result[i])
+        return result
 
     def fuse_hm(self, heatmaps, points):
         # return tf.expand_dims(tf.math.reduce_sum(heatmaps, axis=-1), axis=3)

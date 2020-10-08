@@ -70,11 +70,14 @@ if __name__ == '__main__':
     fg = FacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model',
                    cord_regressor_arch='cord_reg_model',
                    hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
+
                    hm_regressor_weight=None, cord_regressor_weight=None,
                    hm_discriminator_weight=None, cord_discriminator_weight=None,
+
                    input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
                    input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                   input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 1],
-                   input_shape_cord_disc=IbugConf.num_of_landmarks*2)
+
+                   input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 4], # we concat flatten hm and img
+                   input_shape_cord_disc=[IbugConf.num_of_landmarks*2, 2]) # concat 2 generated and real array
     fg.train()
     # fg.train_network()
