@@ -201,13 +201,16 @@ class CNNModel:
         :param input_tensor:
         :return: model
         """
-        initializer = tf.random_normal_initializer(0., 0.02)
-
         imgInput = Input(shape=(224, 224, 3))
         img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
-        hmInput = Input(shape=(56, 56, 1))
-        x = tf.keras.layers.concatenate([hmInput, img_resized])
-        x = self.downsample(64, 4, 1, False)(x)
+        img_avg = tf.keras.layers.Average()([img_resized[:, :, :, 0], img_resized[:, :, :, 1], img_resized[:, :, :,  2]])
+        img_avg = tf.keras.layers.Reshape((56, 56, 1))(img_avg)
+
+        hmInput = Input(shape=(56, 56, 68))
+        hmInput_avg = tf.keras.layers.Average()([hmInput[:, :, :, i] for i in range(68)])
+        hmInput_avg = tf.keras.layers.Reshape((56, 56, 1))(hmInput_avg)
+        concat_inp = tf.keras.layers.concatenate([hmInput_avg, img_avg])
+        x = self.downsample(64, 4, 1, False)(concat_inp)
         x = self.downsample(64, 4, 1)(x)
         x = self.downsample(64, 4, 2)(x)
 

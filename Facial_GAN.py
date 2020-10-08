@@ -17,6 +17,7 @@ import itertools
 from skimage.transform import resize
 from image_utility import ImageUtility
 import img_printer as imgpr
+import datetime
 
 tf.config.set_soft_device_placement(True)
 print("IS GPU AVAIL:: ", str(tf.test.is_gpu_available()))
@@ -123,18 +124,14 @@ class FacialGAN:
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
         total_loss = real_loss + fake_loss
-        tf.print(loss_type, "-DIDC->ep: ", str(epoch), " ind: ", str(b_index), 'rl:{ ', real_loss, '} fl:{', fake_loss,
-                 '} lT:{', total_loss, '}')
-        return total_loss
+        return real_loss, fake_loss, total_loss
 
     def regressor_loss(self, real_output, fake_output, loss_type, epoch, b_index):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         loss_reg = tf.reduce_mean(tf.abs(real_output - fake_output))
         loss_disc = cross_entropy(tf.ones_like(fake_output), fake_output)
         loss_total = 100 * loss_reg + loss_disc
-        tf.print(loss_type, "-REG->ep: ", str(epoch), "->ind: ", str(b_index),
-                 'lg:{ ', loss_reg, '} ld:{', loss_disc, 'lT:{', loss_total, '}')
-        return loss_total
+        return loss_reg, loss_disc, loss_total
 
     def _create_ckpt(self, epoch, hm_generator_optimizer, cord_generator_optimizer, hm_discriminator_optimizer,
                      cord_discriminator_optimizer, hm_generator, cord_generator, hm_discriminator, cord_discriminator):
@@ -155,9 +152,9 @@ class FacialGAN:
         hm_discriminator.save_weights(checkpoint_dir + 'hm_disc_' + str(epoch) + '_.h5')
         cord_discriminator.save_weights(checkpoint_dir + 'cord_disc_' + str(epoch) + '_.h5')
 
-    # @tf.function
+    @tf.function
     def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model,
-                   hm_reg_optimizer, hm_disc_optimizer):
+                   hm_reg_optimizer, hm_disc_optimizer, summary_writer):
 
         with tf.GradientTape() as hm_reg_tape, tf.GradientTape() as hm_disc_tape, tf.GradientTape():
             '''prediction'''
@@ -165,23 +162,33 @@ class FacialGAN:
 
             '''hm GAN'''
             '''     flatten both heatmaps'''
-            flat_heatmaps_gr = self.flatten_hm(heatmaps_gr, 'real'+str(epoch)+str(step))
-            flat_heatmaps_pr = self.flatten_hm(heatmaps_pr, 'fake'+str(epoch)+str(step))
+            # flat_heatmaps_gr = self.flatten_hm(heatmaps_gr, 'real'+str(epoch)+str(step))
+            # flat_heatmaps_pr = self.flatten_hm(heatmaps_pr, 'fake'+str(epoch)+str(step))
             '''create'''
-            real_hm = hm_disc_model([images, flat_heatmaps_gr])
-            fake_hm = hm_disc_model([images, flat_heatmaps_pr])
+            real_hm = hm_disc_model([images, heatmaps_gr])
+            fake_hm = hm_disc_model([images, heatmaps_pr])
 
             '''loss calculation'''
-            hm_reg_loss = self.regressor_loss(real_output=heatmaps_gr, fake_output=heatmaps_pr, loss_type='hm',
-                                              epoch=epoch, b_index=step)
-            hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm, loss_type='hm',
-                                                   epoch=epoch, b_index=step)
+            loss_reg, loss_disc, hm_reg_loss = self.regressor_loss(real_output=heatmaps_gr, fake_output=heatmaps_pr,
+                                                                   loss_type='hm', epoch=epoch, b_index=step)
+            real_loss, fake_loss, hm_disc_loss = self.discriminator_loss(real_output=real_hm, fake_output=fake_hm,
+                                                                         loss_type='hm', epoch=epoch, b_index=step)
         ''' Calculate: Gradients'''
         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_loss, hm_reg_model.trainable_variables)
         gradients_of_hm_disc = hm_disc_tape.gradient(hm_disc_loss, hm_disc_model.trainable_variables)
         '''apply Gradients:'''
         hm_reg_optimizer.apply_gradients(zip(gradients_of_hm_reg, hm_reg_model.trainable_variables))
         hm_disc_optimizer.apply_gradients(zip(gradients_of_hm_disc, hm_disc_model.trainable_variables))
+
+        tf.print("HM:->ep: ", str(epoch), "->step: ", str(step), 'Reg-lg:{ ', loss_reg, '} Reg-ld:{', loss_disc,
+                 'Reg-Total:{', hm_reg_loss, '}', 'D-rl:{ ', real_loss, '} D-fl:{', fake_loss,
+                 '} D-Total:{', hm_disc_loss, '}')
+
+        with summary_writer.as_default():
+            tf.summary.scalar('gen_total_loss', hm_reg_loss, step=epoch)
+            tf.summary.scalar('gen_gan_loss', loss_disc, step=epoch)
+            tf.summary.scalar('gen_l1_loss', loss_reg, step=epoch)
+            tf.summary.scalar('disc_loss', hm_disc_loss, step=epoch)
 
     # def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model, cord_reg_model,
     #              cord_disc_model,
@@ -225,14 +232,15 @@ class FacialGAN:
     #         cord_disc_optimizer.apply_gradients(zip(gradients_of_cord_disc, cord_disc_model.trainable_variables))
 
     def train(self):
+        summary_writer = tf.summary.create_file_writer("./train_logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
         hm_reg_model = self.make_hm_generator_model()
         hm_disc_model = self.make_hm_discriminator_model()
         # cord_reg_model = self.make_cord_generator_model()
         # cord_disc_model = self.make_cord_discriminator_model()
 
-        hm_reg_optimizer = self._get_optimizer(lr=1e-2)
-        hm_disc_optimizer = self._get_optimizer(lr=1e-2)
+        hm_reg_optimizer = self._get_optimizer(lr=2e-4)
+        hm_disc_optimizer = self._get_optimizer(lr=2e-4)
         # cord_reg_optimizer = self._get_optimizer(lr=1e-2)
         # cord_disc_optimizer = self._get_optimizer(lr=1e-2)
 
@@ -250,7 +258,8 @@ class FacialGAN:
                 self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr,
                                 points_gr=points_gr, hm_reg_model=hm_reg_model,
                                 hm_disc_model=hm_disc_model,
-                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer)
+                                hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
+                                summary_writer=summary_writer)
 
                 # self.train_step(epoch=epoch, step=batch_index, images=images, heatmaps_gr=heatmaps_gr,
                 #                 points_gr=points_gr, hm_reg_model=hm_reg_model,
@@ -351,8 +360,8 @@ class FacialGAN:
 
     def flatten_hm(self, heatmaps, lbl):
         result = tf.expand_dims(tf.math.reduce_sum(heatmaps, axis=-1), axis=3)
-        for i in range(LearningConfig.batch_size):
-            imgpr.print_image_arr_heat(lbl + '_' + str(i), result[i])
+        # for i in range(LearningConfig.batch_size):
+        #     imgpr.print_image_arr_heat(lbl + '_' + str(i), result[i])
         return result
 
     def fuse_hm(self, heatmaps, points):

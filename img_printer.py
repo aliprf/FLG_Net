@@ -123,7 +123,7 @@ def print_image_arr_heat(k, image, print_single=False):
     plt.figure()
     plt.imshow(img, vmin=0, vmax=1)
     plt.axis('off')
-    plt.savefig('heat_' + str(k) + '.png', bbox_inches='tight')
+    plt.savefig('./out_imgs/heat_' + str(k) + '.png', bbox_inches='tight')
     plt.clf()
 
 def print_histogram_plt(k, type, landmarks_arr):
