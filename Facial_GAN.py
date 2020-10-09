@@ -147,14 +147,13 @@ class FacialGAN:
         :return:
         """
         tf_util = TFRecordUtility(self.num_landmark//2)
-
+        x_center = 112
+        width = 224
+        hm_arr = []
         if which_tensor == 1:
             '''hm is a tensor and pts is a np array'''
             pts = tf.convert_to_tensor(pts)
             ''''''
-            hm_arr = []
-            x_center = 112
-            width = 224
             for i in range(LearningConfig.batch_size):
                 hm_t = tf_util.from_heatmap_to_point_tensor(heatmaps=hm[i], number_of_points=5)
                 hm_t = tf.reshape(tensor=hm_t, shape=self.num_landmark)
@@ -166,10 +165,12 @@ class FacialGAN:
         else:
             '''hm is npArray and pts is tensor'''
             '''hm is a np, so we first convert it to points, then Tensor'''
-            _, _, hm = tf_util.from_heatmap_to_point(heatmaps=hm, number_of_points=5)
-            '''hm is in [0,224] --> should be in [-1,1]'''
-
-            hm_pts = tf.convert_to_tensor(hm)
+            for i in range(LearningConfig.batch_size):
+                _, _, hm_t = tf_util.from_heatmap_to_point(heatmaps=hm[i], number_of_points=5)
+                '''hm is in [0,224] --> should be in [-0.5,+0.5]'''
+                hm_t_norm = (hm_t - x_center) / width
+                hm_arr.append(hm_t_norm)
+            hm_pts = tf.convert_to_tensor(np.array(hm_arr))
 
         mae = tf.reduce_mean(tf.abs(hm_pts - pts))
         return mae
@@ -181,28 +182,42 @@ class FacialGAN:
         total_loss = real_loss + fake_loss
         return real_loss, fake_loss, total_loss
 
-    def hm_regressor_loss(self, hm_gr, hm_pr, pnt_gr):
+    def hm_regressor_loss(self, hm_gr, hm_pr, pnt_gr, pnt_pr):
         """"""
         '''defining hyper parameters'''
-        w_h_loss = 3
+        w_h_loss = 5
         w_reg_loss = 100
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         loss_reg = tf.reduce_mean(tf.abs(hm_gr - hm_pr))
         loss_discrimination = cross_entropy(tf.ones_like(hm_pr), hm_pr)
+
         '''calculating hm_pr VS points_gr loss'''
         loss_hm_pts = self.calc_hm_pts_MAE(hm=hm_pr, pts=pnt_gr, which_tensor=1)
+
         '''creating Total loss'''
         loss_regression = w_reg_loss * (w_h_loss * loss_reg + loss_hm_pts)
         loss_total = loss_regression + loss_discrimination
+
         return loss_regression, loss_discrimination, loss_total
 
-    def coord_regressor_loss(self, real_output, fake_output):
+    def coord_regressor_loss(self, pnt_gr, pnt_pr, hm_gr, hm_pr):
+        """"""
+        '''defining hyper parameters'''
+        w_pts_loss = 5
+        w_reg_loss = 100
+        '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        loss_reg = tf.reduce_mean(tf.abs(real_output - fake_output))
-        loss_disc = cross_entropy(tf.ones_like(fake_output), fake_output)
-        loss_total = 100 * loss_reg + loss_disc
-        return loss_reg, loss_disc, loss_total
+        loss_reg = tf.reduce_mean(tf.abs(pnt_gr - pnt_pr))
+        loss_discrimination = cross_entropy(tf.ones_like(pnt_pr), pnt_pr)
+
+        '''calculating hm_pr VS points_gr loss'''
+        loss_hm_pts = self.calc_hm_pts_MAE(hm=hm_gr, pts=pnt_pr, which_tensor=2)
+        '''creating Total loss'''
+        loss_regression = w_reg_loss * (w_pts_loss * loss_reg + loss_hm_pts)
+        loss_total = loss_regression + loss_discrimination
+
+        return loss_regression, loss_discrimination, loss_total
 
     def coord_discriminator_loss(self, real_output, fake_output):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
