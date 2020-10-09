@@ -138,9 +138,22 @@ class FacialGAN:
         hm_discriminator.save_weights(checkpoint_dir + 'hm_disc_' + str(epoch) + '_.h5')
         cord_discriminator.save_weights(checkpoint_dir + 'cord_disc_' + str(epoch) + '_.h5')
 
+    def calc_pts_to_hm_MAE(self, hm, pts):
+        """
+        we want to convert pts to hm{56 * 56 * self.num_landmark//2} and then calculate loss
+        :param hm: 56 * 56 * self.num_landmark//2
+        :param pts: bs * self.num_landmark: pts are normal between -0.5, +0.5 --> need to upsample
+        :return:
+        """
+        hm_arr = []
+        tf_util = TFRecordUtility(self.num_landmark // 2)
+        for i in range(LearningConfig.batch_size):
+            hm_t = tf_util.generate_hm(height=56, width=56, landmarks=pts[i], s=3.0, upsample=True)
+            hm_arr.append(hm_t)
+
+
     def calc_hm_pts_MAE(self, hm, pts, which_tensor):
         """
-
         :param hm: 56 * 56 * self.num_landmark//2
         :param pts: bs * self.num_landmark
         :param which_tensor:
@@ -193,7 +206,7 @@ class FacialGAN:
         loss_discrimination = cross_entropy(tf.ones_like(hm_pr), hm_pr)
 
         '''calculating hm_pr VS points_gr loss'''
-        loss_hm_pts = self.calc_hm_pts_MAE(hm=hm_pr, pts=pnt_gr, which_tensor=1)
+        loss_hm_pts = self.calc_pts_to_hm_MAE(hm=hm_pr, pts=pnt_pr)
 
         '''creating Total loss'''
         loss_regression = w_reg_loss * (w_h_loss * loss_reg + loss_hm_pts)
@@ -212,7 +225,7 @@ class FacialGAN:
         loss_discrimination = cross_entropy(tf.ones_like(pnt_pr), pnt_pr)
 
         '''calculating hm_pr VS points_gr loss'''
-        loss_hm_pts = self.calc_hm_pts_MAE(hm=hm_gr, pts=pnt_pr, which_tensor=2)
+        loss_hm_pts = self.calc_hm_to_pts_MAE(hm=hm_pr, pts=pnt_pr)
         '''creating Total loss'''
         loss_regression = w_reg_loss * (w_pts_loss * loss_reg + loss_hm_pts)
         loss_total = loss_regression + loss_discrimination
