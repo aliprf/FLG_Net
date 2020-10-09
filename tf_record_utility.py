@@ -538,7 +538,7 @@ class TFRecordUtility:
         # indices =
 
         x = tf.stack([self.__find_nth_biggest_avg_tensor(heatmaps[:, :, i], number_of_points, scalar)
-                      for i in range(LearningConfig.point_len)], -1)
+                      for i in range(self.number_of_landmark)], -1)
         return x
 
         # return np.array(x_points), np.array(y_points), np.array(xy_points)
@@ -789,7 +789,7 @@ class TFRecordUtility:
 
     def generate_normalized_points(self, points_arr, width, height):
         """normalize landmarks based on hyperface method"""
-
+        '''from [224,224] --> [-0.5,+0.5]'''
         x_center = width / 2
         y_center = height / 2
         landmark_arr_flat_normalized = []
