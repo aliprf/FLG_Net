@@ -185,8 +185,8 @@ class IbugConf:
     '''server_config'''
     # _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
     # _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
-    # _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
-    _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
+    _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
+    # _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
 
     img_path_prefix = _Ibug_prefix_path + 'all/'
     rotated_img_path_prefix = _Ibug_prefix_path + '1_train_images_pts_dir/'
