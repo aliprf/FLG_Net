@@ -138,13 +138,7 @@ class FacialGAN:
         hm_discriminator.save_weights(checkpoint_dir + 'hm_disc_' + str(epoch) + '_.h5')
         cord_discriminator.save_weights(checkpoint_dir + 'cord_disc_' + str(epoch) + '_.h5')
 
-    def calc_hm_to_pts_MAE(self, hm, pts, epoch):
-        weight = 0.2
-        # if epoch < 25:
-        #     return 0
-        # elif 50 < epoch < 100:
-        #     weight = 0.3
-
+    def convert_hm_to_pts(self, hm):
         x_center = 112
         width = 224
         hm_arr = []
@@ -154,43 +148,55 @@ class FacialGAN:
             hm_t = tf_util.from_heatmap_to_point_tensor(heatmaps=hm[i], number_of_points=5)
             hm_t = tf.reshape(tensor=hm_t, shape=self.num_landmark)
             '''hm is in [0,224] --> should be in [-0.5,+0.5]'''
-            hm_t_norm = tf.math.scalar_mul(scalar=1 / width, x=tf.math.subtract(hm_t, np.repeat(x_center, self.num_landmark)))
+            hm_t_norm = tf.math.scalar_mul(scalar=1 / width,
+                                           x=tf.math.subtract(hm_t, np.repeat(x_center, self.num_landmark)))
             hm_arr.append(hm_t_norm)
         '''reshape hm'''
         hm_pts = tf.stack([hm_arr[i] for i in range(LearningConfig.batch_size)], 0)  # bs * self.num_landmark
-        mae = tf.reduce_mean(tf.abs(hm_pts - pts))
-        return mae*weight
+        return hm_pts
 
-    def calc_pts_to_hm_MAE(self, hm, pts, epoch):
-        weight = 0.2
-        # if epoch < 25:
-        #     return 0
-        # elif 50 < epoch < 100:
-        #     weight = 0.3
+    def convert_pts_to_hm(self, pts):
         """
-        we want to convert pts to hm{56 * 56 * self.num_landmark//2} and then calculate loss
-        :param hm: 56 * 56 * self.num_landmark//2
-        :param pts: bs * self.num_landmark: pts are normal between -0.5, +0.5 --> need to upsample
-        :return:
-        """
+                we want to convert pts to hm{56 * 56 * self.num_landmark//2} and then calculate loss
+                :param pts: bs * self.num_landmark: pts are normal between -0.5, +0.5 --> need to upsample
+                :return:
+                """
         hm_arr = []
         tf_util = TFRecordUtility(self.num_landmark // 2)
         for i in range(LearningConfig.batch_size):
             hm_t = tf_util.generate_hm(height=56, width=56, landmarks=pts[i], s=3.0, upsample=True)
             hm_arr.append(hm_t)
         hm_pts = tf.convert_to_tensor(np.array(hm_arr))
-        '''calculate MAE'''
-        mae = tf.reduce_mean(tf.abs(hm_pts - hm))
+        return hm_pts
+
+    def calc_hm_to_pts_MAE(self, pnt_pr_conv, pts, epoch):
+        weight = 0.2
+        # if epoch < 25:
+        #     return 0
+        # elif 50 < epoch < 100:
+        #     weight = 0.3
+        mae = tf.reduce_mean(tf.abs(pnt_pr_conv - pts))
         return mae*weight
 
-    def hm_discriminator_loss(self, real_output, fake_output):
+    def calc_pts_to_hm_MAE(self, hm, hm_pr_conv, epoch):
+        weight = 0.2
+        # if epoch < 25:
+        #     return 0
+        # elif 50 < epoch < 100:
+        #     weight = 0.3
+        '''calculate MAE'''
+        mae = tf.reduce_mean(tf.abs(hm_pr_conv - hm))
+        return mae*weight
+
+    def hm_discriminator_loss(self, real_output, fake_output, fake_hm_conv):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
-        total_loss = real_loss + fake_loss
-        return real_loss, fake_loss, total_loss
+        fake_conv_loss = cross_entropy(tf.zeros_like(fake_hm_conv), fake_hm_conv)
+        total_loss = real_loss + fake_loss + fake_conv_loss
+        return real_loss, fake_loss, fake_conv_loss, total_loss
 
-    def hm_regressor_loss(self, hm_gr, hm_pr, pnt_gr, pnt_pr, epoch):
+    def hm_regressor_loss(self, hm_gr, hm_pr, hm_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
         w_reg_loss = 100
@@ -203,15 +209,15 @@ class FacialGAN:
         if False or epoch < 25:
             loss_regression = w_reg_loss * loss_reg
         else:
-            loss_hm_pts = self.calc_pts_to_hm_MAE(hm=hm_pr, pts=pnt_pr, epoch=epoch)
-            loss_regression = w_reg_loss * (loss_reg + loss_hm_pts)
+            loss_hm_conv = self.calc_pts_to_hm_MAE(hm=hm_pr, hm_pr_conv=hm_pr_conv, epoch=epoch)
+            loss_regression = w_reg_loss * (loss_reg + loss_hm_conv)
 
         '''creating Total loss'''
         loss_total = loss_regression + loss_discrimination
 
         return loss_regression, loss_discrimination, loss_total
 
-    def coord_regressor_loss(self, pnt_gr, pnt_pr, hm_gr, hm_pr, epoch):
+    def coord_regressor_loss(self, pnt_gr, pnt_pr, pnt_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
         w_reg_loss = 100
@@ -224,18 +230,19 @@ class FacialGAN:
         if False or epoch < 25:
             loss_regression = w_reg_loss * loss_reg
         else:
-            loss_hm_pts = self.calc_hm_to_pts_MAE(hm=hm_pr, pts=pnt_pr, epoch=epoch)
-            loss_regression = w_reg_loss * (loss_reg + loss_hm_pts)
+            loss_pts_conv = self.calc_hm_to_pts_MAE(pnt_pr_conv=pnt_pr_conv, pts=pnt_pr, epoch=epoch)
+            loss_regression = w_reg_loss * (loss_reg + loss_pts_conv)
         '''creating Total loss'''
         loss_total = loss_regression + loss_discrimination
         return loss_regression, loss_discrimination, loss_total
 
-    def coord_discriminator_loss(self, real_output, fake_output):
+    def coord_discriminator_loss(self, real_output, fake_output, fake_cord_conv):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
-        total_loss = real_loss + fake_loss
-        return real_loss, fake_loss, total_loss
+        fake_conv_loss = cross_entropy(tf.zeros_like(fake_cord_conv), fake_cord_conv)
+        total_loss = real_loss + fake_loss + fake_conv_loss
+        return real_loss, fake_loss, fake_conv_loss, total_loss
 
     # @tf.function
     def train_step(self, epoch, step, images, heatmaps_gr, points_gr, hm_reg_model, hm_disc_model, cord_reg_model,
@@ -248,31 +255,39 @@ class FacialGAN:
             heatmaps_pr = hm_reg_model(images)
             points_pr = cord_reg_model(images)
 
+            '''convertion'''
+            pnt_pr_conv = self.convert_hm_to_pts(heatmaps_pr)
+            hm_pr_conv = self.convert_pts_to_hm(points_pr)
+
             '''hm:     create disc'''
             real_hm = hm_disc_model([images, heatmaps_gr])
             fake_hm = hm_disc_model([images, heatmaps_pr])
+            fake_hm_conv = hm_disc_model([images, hm_pr_conv])
+
             '''cord:     create disc:  for now just sent point, but maybe we need to fuse points with flatten hn'''
             real_cord = cord_disc_model(points_gr)
             fake_cord = cord_disc_model(points_pr)
+            fake_cord_conv = cord_disc_model(pnt_pr_conv)
 
             '''loss calculation'''
             '''     hm loss'''
             hm_loss_reg, hm_loss_disc, hm_reg_total_loss = self.hm_regressor_loss(hm_gr=heatmaps_gr, hm_pr=heatmaps_pr,
-                                                                                  pnt_gr=points_gr, pnt_pr=points_pr,
-                                                                                  epoch=epoch)
-            hm_real_loss, hm_fake_loss, hm_disc_total_loss = self.hm_discriminator_loss(real_output=real_hm,
-                                                                                        fake_output=fake_hm)
+                                                                                  hm_pr_conv=hm_pr_conv, epoch=epoch)
+            hm_real_loss, hm_fake_loss, hm_fake_conv_loss, hm_disc_total_loss = self.hm_discriminator_loss(
+                real_output=real_hm, fake_output=fake_hm, fake_hm_conv=fake_hm_conv)
             '''     coordinate loss'''
             c_loss_reg, c_loss_disc, c_reg_total_loss = self.coord_regressor_loss(pnt_gr=points_gr, pnt_pr=points_pr,
-                                                                                  hm_gr=heatmaps_gr, hm_pr=heatmaps_pr,
-                                                                                  epoch=epoch)
-            c_real_loss, c_fake_loss, c_disc_total_loss = self.coord_discriminator_loss(real_output=real_cord,
-                                                                                        fake_output=fake_cord)
+                                                                                  pnt_pr_conv=pnt_pr_conv, epoch=epoch)
+            c_real_loss, c_fake_loss, c_fake_conv_loss, c_disc_total_loss = self.coord_discriminator_loss(
+                real_output=real_cord, fake_output=fake_cord, fake_cord_conv=fake_cord_conv)
             '''create custom loss'''
             '''     hm: put more focus'''
-            hm_weight = 5
+            hm_weight = 10
             hm_reg_total_loss = hm_weight * hm_reg_total_loss
             hm_disc_total_loss = hm_weight / 2 * hm_disc_total_loss
+            '''     coord: more focus on generator'''
+            coord_gen_weight = 5
+            c_reg_total_loss = coord_gen_weight * c_reg_total_loss
             '''      Xor loss for hm & cord discriminator'''
 
         ''' Calculate: Gradients'''
@@ -295,18 +310,30 @@ class FacialGAN:
         tf.print("->EPOCH: ", str(epoch), "->STEP: ", str(step),
                  "|||HEATMAP:->", 'hm_reg_total_loss:{', hm_reg_total_loss, '}', 'hm_loss_reg:{ ', hm_loss_reg, '} hm_loss_disc:{', hm_loss_disc,
                  '} hm_disc_total_loss:{', hm_disc_total_loss, '}', 'hm_real_loss:{ ', hm_real_loss, '} hm_fake_loss:{', hm_fake_loss,
+                 '} hm_fake_conv_loss:{', hm_fake_conv_loss,
 
                  "|||COORD:->", 'c_reg_total_loss:{', c_reg_total_loss, '}', 'c_loss_reg:{ ', c_loss_reg, '} c_loss_disc:{', c_loss_disc,
                  '} c_disc_total_loss:{', c_disc_total_loss, '}', 'c_real_loss:{ ', c_real_loss, '} c_fake_loss:{', c_fake_loss,
+                 '} c_fake_conv_loss:{', c_fake_conv_loss,
                  )
 
         with summary_writer.as_default():
             '''     hm'''
-            tf.summary.scalar('hm_g_total_loss', hm_reg_total_loss, step=epoch)
-            tf.summary.scalar('hm_d_total_loss', hm_disc_total_loss, step=epoch)
+            tf.summary.scalar('hm_reg_total_loss', hm_reg_total_loss, step=epoch)
+            tf.summary.scalar('hm_disc_total_loss', hm_disc_total_loss, step=epoch)
             tf.summary.scalar('hm_loss_reg', hm_loss_reg, step=epoch)
             tf.summary.scalar('hm_loss_disc', hm_loss_disc, step=epoch)
+            tf.summary.scalar('hm_real_loss', hm_real_loss, step=epoch)
+            tf.summary.scalar('hm_fake_loss', hm_fake_loss, step=epoch)
+            tf.summary.scalar('hm_fake_conv_loss', hm_fake_conv_loss, step=epoch)
             '''     coord'''
+            tf.summary.scalar('c_reg_total_loss', c_reg_total_loss, step=epoch)
+            tf.summary.scalar('c_disc_total_loss', c_disc_total_loss, step=epoch)
+            tf.summary.scalar('c_loss_reg', c_loss_reg, step=epoch)
+            tf.summary.scalar('c_loss_disc', c_loss_disc, step=epoch)
+            tf.summary.scalar('c_real_loss', c_real_loss, step=epoch)
+            tf.summary.scalar('c_fake_loss', c_fake_loss, step=epoch)
+            tf.summary.scalar('c_fake_conv_loss', c_fake_conv_loss, step=epoch)
 
     def train(self):
         summary_writer = tf.summary.create_file_writer(
@@ -319,8 +346,8 @@ class FacialGAN:
 
         hm_reg_optimizer = self._get_optimizer(lr=2e-4)
         hm_disc_optimizer = self._get_optimizer(lr=1e-4)
-        cord_reg_optimizer = self._get_optimizer(lr=2e-2)
-        cord_disc_optimizer = self._get_optimizer(lr=1e-2)
+        cord_reg_optimizer = self._get_optimizer(lr=2e-4)
+        cord_disc_optimizer = self._get_optimizer(lr=1e-6)
 
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
@@ -341,13 +368,13 @@ class FacialGAN:
                                 hm_reg_optimizer=hm_reg_optimizer, hm_disc_optimizer=hm_disc_optimizer,
                                 cord_reg_optimizer=cord_reg_optimizer, cord_disc_optimizer=cord_disc_optimizer,
                                 summary_writer=summary_writer)
-            # if (epoch + 1) % 2 == 0:
-            #     self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
-            #                       cord_generator_optimizer=cord_reg_optimizer,
-            #                       hm_discriminator_optimizer=hm_disc_optimizer,
-            #                       cord_discriminator_optimizer=cord_disc_optimizer,
-            #                       hm_generator=hm_reg_model, cord_generator=cord_reg_model,
-            #                       hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
+            if (epoch + 1) % 2 == 0:
+                self._create_ckpt(epoch=epoch, hm_generator_optimizer=hm_reg_optimizer,
+                                  cord_generator_optimizer=cord_reg_optimizer,
+                                  hm_discriminator_optimizer=hm_disc_optimizer,
+                                  cord_discriminator_optimizer=cord_disc_optimizer,
+                                  hm_generator=hm_reg_model, cord_generator=cord_reg_model,
+                                  hm_discriminator=hm_disc_model, cord_discriminator=cord_disc_model)
 
         # -----------------------------------------------------
 
