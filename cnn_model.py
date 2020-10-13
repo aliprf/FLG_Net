@@ -64,7 +64,7 @@ class CNNModel:
         :return: model
         """
 
-        eff_net = efn.EfficientNetB0(include_top=True,
+        eff_net = efn.EfficientNetB7(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
@@ -152,7 +152,7 @@ class CNNModel:
         :return: model
         """
 
-        eff_net = efn.EfficientNetB0(include_top=True,
+        eff_net = efn.EfficientNetB7(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
@@ -183,6 +183,14 @@ class CNNModel:
         x = Dense(128, activation="relu")(inputs)
         x = Dense(128, activation="relu")(x)
         x = Dense(128, activation="relu")(x)
+        x = Dense(128, activation="relu")(x)
+        x = Dense(256, activation="relu")(x)
+        x = Dense(256, activation="relu")(x)
+        x = Dense(256, activation="relu")(x)
+        x = Dense(256, activation="relu")(x)
+        x = Dense(512, activation="relu")(x)
+        x = Dense(512, activation="relu")(x)
+        x = Dense(512, activation="relu")(x)
         x = Dropout(.5)(x)
         outputs = Dense(1)(x)
 
@@ -195,12 +203,7 @@ class CNNModel:
         return model
 
     def create_hm_disc_model(self, input_shape, input_tensor):
-        """
-        This is EfficientNet-B7 used as a binary classifier network.
-        :param input_shape:
-        :param input_tensor:
-        :return: model
-        """
+
         imgInput = Input(shape=(224, 224, 3))
         img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
         img_avg = tf.keras.layers.Average()([img_resized[:, :, :, 0], img_resized[:, :, :, 1], img_resized[:, :, :,  2]])

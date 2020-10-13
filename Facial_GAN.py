@@ -206,7 +206,7 @@ class FacialGAN:
         loss_discrimination = cross_entropy(tf.ones_like(hm_pr), hm_pr)
 
         '''calculating hm_pr VS points_gr loss'''
-        if False or epoch < 25:
+        if epoch < 25:
             loss_regression = w_reg_loss * loss_reg
         else:
             loss_hm_conv = self.calc_pts_to_hm_MAE(hm=hm_pr, hm_pr_conv=hm_pr_conv, epoch=epoch)
@@ -227,7 +227,7 @@ class FacialGAN:
         loss_discrimination = cross_entropy(tf.ones_like(pnt_pr), pnt_pr)
 
         '''calculating hm_pr VS points_gr loss'''
-        if False or epoch < 25:
+        if epoch < 25:
             loss_regression = w_reg_loss * loss_reg
         else:
             loss_pts_conv = self.calc_hm_to_pts_MAE(pnt_pr_conv=pnt_pr_conv, pts=pnt_pr, epoch=epoch)
