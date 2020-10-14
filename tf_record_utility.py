@@ -881,11 +881,10 @@ class TFRecordUtility:
         return hm
 
     def generate_hm_Ten(self, height, width, landmarks, s=3.0, upsample=True):
-        Nlandmarks = 136
-        hm = np.zeros((height, width, Nlandmarks // 2), dtype=np.float32)
+        hm = np.zeros((height, width, self.number_of_landmark), dtype=np.float32)
 
         j = 0
-        for i in range(0, Nlandmarks, 2):
+        for i in range(0, self.number_of_landmark, 2):
 
             if upsample:
                 x = landmarks[i] * InputDataSize.image_input_size//4 + InputDataSize.img_center//4

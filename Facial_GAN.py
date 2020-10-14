@@ -163,10 +163,12 @@ class FacialGAN:
                 :param pts: bs * self.num_landmark: pts are normal between -0.5, +0.5 --> need to upsample
                 :return:
                 """
+        pts = pts.numpy()
+        # pts = tf.keras.backend.eval(pts)
         hm_arr = []
         tf_util = TFRecordUtility(self.num_landmark // 2)
         for i in range(LearningConfig.batch_size):
-            hm_t = tf_util.generate_hm(height=56, width=56, landmarks=pts[i], s=3.0, upsample=True)
+            hm_t = tf_util.generate_hm_Ten(height=56, width=56, landmarks=pts[i], s=3.0, upsample=True)
             hm_arr.append(hm_t)
         hm_pts = tf.convert_to_tensor(np.array(hm_arr))
         return hm_pts

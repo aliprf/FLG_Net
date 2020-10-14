@@ -12,7 +12,6 @@ class DatasetName:
     ibug_test = 'ibug_test'
 
 
-
 class DatasetType:
     ibug_challenging = 10
     ibug_comomn = 11
@@ -39,10 +38,10 @@ class LearningConfig:
 
 class InputDataSize:
     image_input_size = 224
-    img_center = image_input_size //2  # 112
+    img_center = image_input_size // 2  # 112
 
-    hm_size = image_input_size//4  # 56
-    hm_center = hm_size//2 #  28
+    hm_size = image_input_size // 4  # 56
+    hm_center = hm_size // 2  # 28
 
     # landmark_face_len = 54
     # landmark_nose_len = 18
@@ -135,7 +134,7 @@ class WflwConf:
 
     number_of_all_sample = 0  # just images. dont count both img and lbls
     number_of_train_sample = int(number_of_all_sample * 0.95)  # 95 % for train
-    number_of_evaluation_sample = int(number_of_all_sample * 0.05) # 5% for evaluation
+    number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
     augmentation_factor = 4  # create . image from 4
     augmentation_factor_rotate = 15  # create . image from 15
@@ -181,10 +180,11 @@ class CofwConf:
     num_face_graph_elements = 8
     hm_stride = 3
 
+
 class IbugConf:
     '''server_config'''
-    # _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
-    _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
+    _Ibug_prefix_path = '/media/data3/ali/FL/ibug/'  # --> Zeus
+    # _Ibug_prefix_path = '/media/data2/alip/FL/ibug/'  # --> Atlas
     # _Ibug_prefix_path = '/media/ali/data/ibug/'  # --> local_0
     # _Ibug_prefix_path = '/media/ali/extradata/data/ibug/'  # --> local_1
 
@@ -210,7 +210,7 @@ class IbugConf:
     orig_number_of_test_challenging = 135
 
     '''after augmentation'''
-    number_of_all_sample = 0   # afw, train_helen, train_lfpw
+    number_of_all_sample = 0  # afw, train_helen, train_lfpw
     number_of_train_sample = int(number_of_all_sample * 0.95)  # 95 % for train
     number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
@@ -219,4 +219,3 @@ class IbugConf:
     num_of_landmarks = 68
     num_face_graph_elements = 9
     hm_stride = 2
-
