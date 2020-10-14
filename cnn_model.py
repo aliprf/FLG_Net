@@ -205,7 +205,8 @@ class CNNModel:
     def create_hm_disc_model(self, input_shape, input_tensor):
 
         imgInput = Input(shape=(224, 224, 3))
-        img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
+        # img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
+        img_resized = tf.compat.v1.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
         img_avg = tf.keras.layers.Average()([img_resized[:, :, :, 0], img_resized[:, :, :, 1], img_resized[:, :, :,  2]])
         img_avg = tf.keras.layers.Reshape((56, 56, 1))(img_avg)
 

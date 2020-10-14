@@ -880,6 +880,27 @@ class TFRecordUtility:
             j += 1
         return hm
 
+    def generate_hm_Ten(self, height, width, landmarks, s=3.0, upsample=True):
+        Nlandmarks = 136
+        hm = np.zeros((height, width, Nlandmarks // 2), dtype=np.float32)
+
+        j = 0
+        for i in range(0, Nlandmarks, 2):
+
+            if upsample:
+                x = landmarks[i] * InputDataSize.image_input_size//4 + InputDataSize.img_center//4
+                y = landmarks[i + 1] * InputDataSize.image_input_size//4 + InputDataSize.img_center//4
+            else:
+                x = landmarks[i]
+                y = landmarks[i + 1]
+
+            # x = int(x // 4)
+            # y = int(y // 4)
+
+            hm[:, :, j] = self.__gaussian_k(x, y, s, height, width)
+            j += 1
+        return hm
+
     def __parse_function_reduced(self, proto):
         keys_to_features = {'landmarks': tf.FixedLenFeature([self.number_of_landmark], tf.float32),
                             'heatmap': tf.FixedLenFeature([56, 56, 68], tf.float32),

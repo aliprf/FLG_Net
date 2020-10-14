@@ -138,6 +138,7 @@ class FacialGAN:
         hm_discriminator.save_weights(checkpoint_dir + 'hm_disc_' + str(epoch) + '_.h5')
         cord_discriminator.save_weights(checkpoint_dir + 'cord_disc_' + str(epoch) + '_.h5')
 
+    @tf.autograph.experimental.do_not_convert
     def convert_hm_to_pts(self, hm):
         x_center = 112
         width = 224
@@ -155,6 +156,7 @@ class FacialGAN:
         hm_pts = tf.stack([hm_arr[i] for i in range(LearningConfig.batch_size)], 0)  # bs * self.num_landmark
         return hm_pts
 
+    @tf.autograph.experimental.do_not_convert
     def convert_pts_to_hm(self, pts):
         """
                 we want to convert pts to hm{56 * 56 * self.num_landmark//2} and then calculate loss
@@ -188,11 +190,14 @@ class FacialGAN:
         mae = tf.reduce_mean(tf.abs(hm_pr_conv - hm))
         return mae*weight
 
-    def hm_discriminator_loss(self, real_output, fake_output, fake_hm_conv):
+    def hm_discriminator_loss(self, real_output, fake_output, fake_hm_conv, epoch):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
-        fake_conv_loss = cross_entropy(tf.zeros_like(fake_hm_conv), fake_hm_conv)
+        if epoch > 25:
+            fake_conv_loss = cross_entropy(tf.zeros_like(fake_hm_conv), fake_hm_conv)
+        else:
+            fake_conv_loss = 0
         total_loss = real_loss + fake_loss + fake_conv_loss
         return real_loss, fake_loss, fake_conv_loss, total_loss
 
@@ -236,11 +241,14 @@ class FacialGAN:
         loss_total = loss_regression + loss_discrimination
         return loss_regression, loss_discrimination, loss_total
 
-    def coord_discriminator_loss(self, real_output, fake_output, fake_cord_conv):
+    def coord_discriminator_loss(self, real_output, fake_output, fake_cord_conv, epoch):
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
-        fake_conv_loss = cross_entropy(tf.zeros_like(fake_cord_conv), fake_cord_conv)
+        if epoch > 25:
+            fake_conv_loss = cross_entropy(tf.zeros_like(fake_cord_conv), fake_cord_conv)
+        else:
+            fake_conv_loss = 0
         total_loss = real_loss + fake_loss + fake_conv_loss
         return real_loss, fake_loss, fake_conv_loss, total_loss
 
@@ -256,8 +264,8 @@ class FacialGAN:
             points_pr = cord_reg_model(images)
 
             '''convertion'''
-            pnt_pr_conv = self.convert_hm_to_pts(heatmaps_pr)
             hm_pr_conv = self.convert_pts_to_hm(points_pr)
+            pnt_pr_conv = self.convert_hm_to_pts(heatmaps_pr)
 
             '''hm:     create disc'''
             real_hm = hm_disc_model([images, heatmaps_gr])
@@ -274,12 +282,12 @@ class FacialGAN:
             hm_loss_reg, hm_loss_disc, hm_reg_total_loss = self.hm_regressor_loss(hm_gr=heatmaps_gr, hm_pr=heatmaps_pr,
                                                                                   hm_pr_conv=hm_pr_conv, epoch=epoch)
             hm_real_loss, hm_fake_loss, hm_fake_conv_loss, hm_disc_total_loss = self.hm_discriminator_loss(
-                real_output=real_hm, fake_output=fake_hm, fake_hm_conv=fake_hm_conv)
+                real_output=real_hm, fake_output=fake_hm, fake_hm_conv=fake_hm_conv, epoch=epoch)
             '''     coordinate loss'''
             c_loss_reg, c_loss_disc, c_reg_total_loss = self.coord_regressor_loss(pnt_gr=points_gr, pnt_pr=points_pr,
                                                                                   pnt_pr_conv=pnt_pr_conv, epoch=epoch)
             c_real_loss, c_fake_loss, c_fake_conv_loss, c_disc_total_loss = self.coord_discriminator_loss(
-                real_output=real_cord, fake_output=fake_cord, fake_cord_conv=fake_cord_conv)
+                real_output=real_cord, fake_output=fake_cord, fake_cord_conv=fake_cord_conv, epoch=epoch)
             '''create custom loss'''
             '''     hm: put more focus'''
             hm_weight = 10
