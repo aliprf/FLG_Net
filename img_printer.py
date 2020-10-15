@@ -231,8 +231,8 @@ def print_arr(k, type, landmarks_arr):
 
 def print_image_arr(k, image, landmarks_x, landmarks_y):
     plt.figure()
-    plt.imshow(image)
-    implot = plt.imshow(image)
+    if image is not None:
+        plt.imshow(image)
 
     for i in range(len(landmarks_x)):
         plt.text(landmarks_x[i], landmarks_y[i], str(i), fontsize=12, c='red',
@@ -242,7 +242,8 @@ def print_image_arr(k, image, landmarks_x, landmarks_y):
     plt.scatter(x=landmarks_x[:], y=landmarks_y[:], c='#440047', s=60)
     plt.scatter(x=landmarks_x[:], y=landmarks_y[:], c='#fbecec', s=10)
     plt.axis('off')
-    plt.savefig('name_' + str(k) + '.png', bbox_inches='tight')
+    # plt.savefig('./out_imgs/name_' + str(k) + '.png', bbox_inches='tight')
+    plt.savefig('./out_imgs/name_' + str(k) + '.png', bbox_inches='tight')
     # plt.show()
     plt.clf()
 

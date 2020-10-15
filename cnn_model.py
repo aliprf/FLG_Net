@@ -46,6 +46,7 @@ class CNNModel:
             model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor,
                                              num_landmark=num_landmark)
         elif arch == 'cord_reg_model':
+            # model = self.mobileNet_v2_main(input_tensor)
             model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor,
                                                num_landmark=num_landmark)
         elif arch == 'hm_Disc_model':
@@ -64,7 +65,7 @@ class CNNModel:
         :return: model
         """
 
-        eff_net = efn.EfficientNetB7(include_top=True,
+        eff_net = efn.EfficientNetB3(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
@@ -73,68 +74,73 @@ class CNNModel:
 
         eff_net.layers.pop()
         inp = eff_net.input
+        initializer = tf.random_normal_initializer(0., 0.02)
 
         top_activation = eff_net.get_layer('top_activation').output
-        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                            kernel_initializer='he_uniform')(top_activation)  # 14, 14, 256
+        x = Conv2DTranspose(256, 4, strides=2, padding='same', kernel_initializer=initializer, use_bias=False)(top_activation)  # 14, 14, 256
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
         x = ReLU()(x)
 
-        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                            kernel_initializer='he_uniform')(x)  # 28, 28, 256
+        x = Conv2DTranspose(256, 4, strides=2, padding='same',
+                            kernel_initializer=initializer, use_bias=False)(x)  # 28, 28, 256
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
         x = ReLU()(x)
 
-        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                            kernel_initializer='he_uniform')(x)  # 56, 56, 256
-        bn_0 = BatchNormalization(name='bn_0')(x)
+        x = Conv2DTranspose(256, 4, strides=2, padding='same',
+                            kernel_initializer=initializer, use_bias=False)(x)  # 56, 56, 256
+        x = BatchNormalization(name='bn_0')(x)
         x = Dropout(0.5)(x)
-        x = ReLU()(bn_0)
+        rel_0 = ReLU()(x)
 
         '''reduce to  7'''
-        x = Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding='same', kernel_initializer='he_uniform')(
-            x)  # 28, 28, 256
-        bn_1 = BatchNormalization(name='bn_1')(x)  # 28, 28, 256
+        x = Conv2D(256, 4, strides=2, padding='same', kernel_initializer=initializer, use_bias=False)(rel_0)  # 28, 28, 256
+        x = BatchNormalization(name='bn_1')(x)  # 28, 28, 256
         x = Dropout(0.5)(x)
-        x = ReLU()(bn_1)
+        rel_1 = ReLU()(x)
 
-        x = Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding='same', kernel_initializer='he_uniform')(
-            x)  # 14, 14, 256
-        bn_2 = BatchNormalization(name='bn_2')(x)  # 14, 14, 256
+        x = Conv2D(256, 4, strides=2, padding='same', kernel_initializer=initializer, use_bias=False)(rel_1)  # 14, 14, 256
+        x = BatchNormalization(name='bn_2')(x)  # 14, 14, 256
         x = Dropout(0.5)(x)
-        x = ReLU()(bn_2)
+        rel_2 = ReLU()(x)
 
-        x = Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding='same', kernel_initializer='he_uniform')(
-            x)  # 7, 7 , 256
-        bn_3 = BatchNormalization(name='bn_3')(x)  # 7, 7 , 256
+        x = Conv2D(256, 4, strides=2, padding='same', kernel_initializer=initializer, use_bias=False)(rel_2)  # 7, 7 , 256
+        x = BatchNormalization(name='bn_3')(x)  # 7, 7 , 256
         x = Dropout(0.5)(x)
-        x = ReLU()(bn_3)
+        rel_3 = ReLU()(x)
 
         '''increase to  56'''
-        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                            name='deconv1', kernel_initializer='he_uniform')(x)  # 14, 14, 256
+        x = Conv2DTranspose(256, 4, strides=2, padding='same',
+                            name='deconv1', kernel_initializer=initializer, use_bias=False)(rel_3)  # 14, 14, 256
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
-        x = tf.keras.layers.add([x, bn_2])  # 14, 14, 256
         x = ReLU()(x)
+        x = tf.keras.layers.Concatenate()([x, rel_2])  # 14, 14, 256
 
-        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                            name='deconv2', kernel_initializer='he_uniform')(x)  # 28, 28, 256
+        x = Conv2DTranspose(256, 4, strides=2, padding='same',
+                            name='deconv2', kernel_initializer=initializer, use_bias=False)(x)  # 28, 28, 256
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
-        x = tf.keras.layers.add([x, bn_1])  # 28, 28, 256
         x = ReLU()(x)
+        x = tf.keras.layers.Concatenate()([x, rel_1])  # 28, 28, 256
 
-        x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same',
-                            name='deconv3', kernel_initializer='he_uniform')(x)  # 56, 56, 256
+
+        '''out NEW1'''
+        x = Conv2DTranspose(256, 4, strides=2, padding='same',
+                            name='deconv3', kernel_initializer=initializer, use_bias=False)(x)  # 56, 56, 256
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
-        x = tf.keras.layers.add([x, bn_0])  # 56, 56, 256
+        x = ReLU()(x)
+        x = tf.keras.layers.Concatenate()([x, rel_0])  # 56, 56, 256
 
         '''out heatmap regression'''
-        out_heatmap = Conv2D(num_landmark // 2, kernel_size=1, padding='same', name='O_hm')(x)
+        # out_heatmap = Conv2D(num_landmark // 2, kernel_size=1, padding='same', name='O_hm')(x)
+
+        '''out NEW2'''
+        out_heatmap = Conv2DTranspose(num_landmark // 2, 4, strides=1, padding='same',
+                            kernel_initializer=initializer, activation='tanh')(x)  # 56, 56, 256
+
         eff_net = Model(inp, [out_heatmap])
         eff_net.summary()
 
@@ -144,6 +150,35 @@ class CNNModel:
         return eff_net
 
     def create_cord_reg_model(self, input_shape, input_tensor, num_landmark):
+        res = resnet50.ResNet50(include_top=True,
+                                     weights=None,
+                                     input_tensor=input_tensor,
+                                     input_shape=input_shape,
+                                     pooling=None,
+                                     classes=num_landmark)  # or weights='noisy-student' GlobalAveragePooling2
+        # res.summary()
+        res.layers.pop()
+        initializer = tf.random_normal_initializer(0., 0.02)
+
+        x = res.get_layer('avg_pool').output  # 1280
+        x = Dense(num_landmark, name='dense_layer_out_2', activation='relu',
+                  kernel_initializer=initializer, use_bias=False)(x)
+        out = Dense(num_landmark, activation='linear', name='out', kernel_initializer=initializer, use_bias=False)(x)
+        inp = res.input
+
+        revised_model = Model(inp, out)
+
+        revised_model.summary()
+        # plot_model(revised_model, to_file='mobileNet_v2_main.png', show_shapes=True, show_layer_names=True)
+        model_json = revised_model.to_json()
+
+        with open("ResNet50.json", "w") as json_file:
+            json_file.write(model_json)
+
+        return revised_model
+
+
+    def _create_cord_reg_model(self, input_shape, input_tensor, num_landmark):
         """
         This is EfficientNet-B7 combined with one stack of StackedHourGlassNetwork used as heatmap & geo regressor network.
         :param input_shape:
@@ -152,7 +187,7 @@ class CNNModel:
         :return: model
         """
 
-        eff_net = efn.EfficientNetB7(include_top=True,
+        eff_net = efn.EfficientNetB3(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
@@ -162,14 +197,13 @@ class CNNModel:
         eff_net.layers.pop()
         inp = eff_net.input
 
-        top_activation = eff_net.get_layer('top_activation').output
+        x = eff_net.get_layer('top_activation').output
+        x = GlobalAveragePooling2D()(x)
+        x = Dropout(rate=0.3)(x)
+        output = Dense(num_landmark, activation='linear', name='out')(x)
 
-        '''out for geo regression'''
-        x = GlobalAveragePooling2D()(top_activation)
-        x = Dropout(0.5)(x)
-        out_geo = Dense(num_landmark, name='O_geo')(x)
-        #
-        eff_net = Model(inp, out_geo)
+        eff_net = Model(inp, output)
+
         eff_net.summary()
 
         model_json = eff_net.to_json()
@@ -178,8 +212,9 @@ class CNNModel:
         return eff_net
 
     def create_cord_disc_model(self, input_shape, input_tensor):
+        initializer = tf.random_normal_initializer(0., 0.02)
 
-        inputs = inputs = tf.keras.Input(shape=(input_shape,))
+        inputs = tf.keras.Input(shape=(input_shape,))
         x = Dense(128, activation="relu")(inputs)
         x = Dense(128, activation="relu")(x)
         x = Dense(128, activation="relu")(x)
@@ -191,18 +226,19 @@ class CNNModel:
         x = Dense(512, activation="relu")(x)
         x = Dense(512, activation="relu")(x)
         x = Dense(512, activation="relu")(x)
-        x = Dropout(.5)(x)
-        outputs = Dense(1)(x)
+        x = Dropout(.3)(x)
+        outputs = Dense(1, activation='sigmoid',  kernel_initializer=initializer, use_bias=False)(x)
 
         model = tf.keras.Model(inputs=inputs, outputs=outputs, name="cord_disc_model")
         model.summary()
 
-        # model_json = model.to_json()
-        # with open("./model_arch/Disc_cord_model.json", "w") as json_file:
-        #     json_file.write(model_json)
+        model_json = model.to_json()
+        with open("./model_arch/Disc_cord_model.json", "w") as json_file:
+            json_file.write(model_json)
         return model
 
     def create_hm_disc_model(self, input_shape, input_tensor):
+        initializer = tf.random_normal_initializer(0., 0.02)
 
         imgInput = Input(shape=(224, 224, 3))
         img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
@@ -230,7 +266,7 @@ class CNNModel:
 
         x = Dropout(0.3)(x)
         x = Flatten()(x)
-        last = Dense(1)(x)
+        last = Dense(1, activation='sigmoid', kernel_initializer=initializer, use_bias=False)(x)
 
         model = tf.keras.Model(inputs=[imgInput, hmInput], outputs=last)
         model.summary()
@@ -318,20 +354,21 @@ class CNNModel:
         return model
 
     def mobileNet_v2_main(self, tensor):
-        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=None,
+        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=[224, 224,3],
                                                    alpha=1.0,
                                                    include_top=True,
                                                    weights=None,
                                                    input_tensor=tensor,
                                                    pooling=None)
+        mobilenet_model.summary()
         # , classes=cnf.landmark_len)
 
         mobilenet_model.layers.pop()
 
-        x = mobilenet_model.get_layer('global_average_pooling2d_1').output  # 1280
-        x = Dense(LearningConfig.landmark_len, name='dense_layer_out_2', activation='relu',
+        x = mobilenet_model.get_layer('global_average_pooling2d').output  # 1280
+        x = Dense(136, name='dense_layer_out_2', activation='relu',
                   kernel_initializer='he_uniform')(x)
-        Logits = Dense(LearningConfig.landmark_len, name='out')(x)
+        Logits = Dense(136, name='out')(x)
         inp = mobilenet_model.input
 
         revised_model = Model(inp, Logits)
