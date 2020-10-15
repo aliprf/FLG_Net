@@ -65,18 +65,31 @@ class CNNModel:
         :return: model
         """
 
-        eff_net = efn.EfficientNetB3(include_top=True,
-                                     weights=None,
-                                     input_tensor=input_tensor,
-                                     input_shape=input_shape,
-                                     pooling=None,
-                                     classes=num_landmark)  # or weights='noisy-student'
-
-        eff_net.layers.pop()
-        inp = eff_net.input
+        # eff_net = efn.EfficientNetB7(include_top=True,
+        #                              weights=None,
+        #                              input_tensor=input_tensor,
+        #                              input_shape=input_shape,
+        #                              pooling=None,
+        #                              classes=num_landmark)  # or weights='noisy-student'
+        #
+        # eff_net.layers.pop()
+        # inp = eff_net.input
+        # initializer = tf.random_normal_initializer(0., 0.02)
+        #
+        # top_activation = eff_net.get_layer('top_activation').output
+        res = resnet50.ResNet50(include_top=True,
+                                weights=None,
+                                input_tensor=input_tensor,
+                                input_shape=input_shape,
+                                pooling=None,
+                                classes=num_landmark)  # or weights='noisy-student' GlobalAveragePooling2
+        # res.summary()
+        inp = res.input
+        res.layers.pop()
         initializer = tf.random_normal_initializer(0., 0.02)
 
-        top_activation = eff_net.get_layer('top_activation').output
+        top_activation = res.get_layer('conv5_block3_out').output  # 1280
+
         x = Conv2DTranspose(256, 4, strides=2, padding='same', kernel_initializer=initializer, use_bias=False)(top_activation)  # 14, 14, 256
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
@@ -177,7 +190,6 @@ class CNNModel:
 
         return revised_model
 
-
     def _create_cord_reg_model(self, input_shape, input_tensor, num_landmark):
         """
         This is EfficientNet-B7 combined with one stack of StackedHourGlassNetwork used as heatmap & geo regressor network.
@@ -186,8 +198,9 @@ class CNNModel:
         :param num_landmark:
         :return: model
         """
+        initializer = tf.random_normal_initializer(0., 0.02)
 
-        eff_net = efn.EfficientNetB3(include_top=True,
+        eff_net = efn.EfficientNetB7(include_top=True,
                                      weights=None,
                                      input_tensor=input_tensor,
                                      input_shape=input_shape,
@@ -200,7 +213,7 @@ class CNNModel:
         x = eff_net.get_layer('top_activation').output
         x = GlobalAveragePooling2D()(x)
         x = Dropout(rate=0.3)(x)
-        output = Dense(num_landmark, activation='linear', name='out')(x)
+        output = Dense(num_landmark, activation='linear', name='out', kernel_initializer=initializer, use_bias=False)(x)
 
         eff_net = Model(inp, output)
 

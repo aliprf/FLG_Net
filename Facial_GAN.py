@@ -210,7 +210,7 @@ class FacialGAN:
     def hm_regressor_loss(self, hm_gr, hm_pr, hm_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
-        w_reg_loss = 10
+        w_reg_loss = 100
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         loss_reg = tf.reduce_mean(tf.abs(hm_gr - hm_pr))
@@ -226,14 +226,13 @@ class FacialGAN:
 
         '''creating Total loss'''
         loss_total = loss_regression + loss_discrimination
-        # loss_total = loss_regression
 
         return loss_regression, loss_discrimination, loss_total
 
     def coord_regressor_loss(self, pnt_gr, pnt_pr, pnt_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
-        w_reg_loss = 10
+        w_reg_loss = 100
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         # loss_reg = tf.reduce_mean(tf.sqrt(pnt_gr - pnt_pr))
@@ -274,7 +273,7 @@ class FacialGAN:
             points_pr = cord_reg_model(images)
 
             '''showing the results'''
-            if step % 12 == 0:
+            if step % 100 == 0:
                 self.print_hm_cord(epoch, step, images, heatmaps_gr, heatmaps_pr, points_gr, points_pr)
 
             '''conversion'''
@@ -304,12 +303,12 @@ class FacialGAN:
                 real_output=real_cord, fake_output=fake_cord, fake_cord_conv=fake_cord_conv, epoch=epoch)
             '''create custom loss'''
             '''     hm: put more focus'''
-            # hm_weight = 10
-            # hm_reg_total_loss = hm_weight * hm_reg_total_loss
-            # hm_disc_total_loss = hm_weight / 2 * hm_disc_total_loss
-            # '''     coord: more focus on generator'''
-            # coord_gen_weight = 5
-            # c_reg_total_loss = coord_gen_weight * c_reg_total_loss
+            hm_weight = 10
+            hm_reg_total_loss = hm_weight * hm_reg_total_loss
+            hm_disc_total_loss = hm_weight / 2 * hm_disc_total_loss
+            '''     coord: more focus on generator'''
+            coord_gen_weight = 5
+            c_reg_total_loss = coord_gen_weight * c_reg_total_loss
             '''      Xor loss for hm & cord discriminator'''
 
         ''' Calculate: Gradients'''
