@@ -29,14 +29,14 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    # tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks * 2)
-    # tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
+    tf_record_util = TFRecordUtility(CofwConf.num_of_landmarks * 2)
+    tf_record_util.rotaate_and_save(dataset_name=DatasetName.cofw)
     # # # we dont need to use this now# tf_record_util.random_augment_from_rotated(dataset_name=DatasetName.ibug)
     # # '''     normalize the points and save'''
-    # tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
+    tf_record_util.normalize_points_and_save(dataset_name=DatasetName.cofw)
     # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
     # tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
-    # tf_record_util.create_all_heatmap(dataset_name=DatasetName.ibug, dataset_type=None)
+    tf_record_util.create_all_heatmap(dataset_name=DatasetName.cofw, dataset_type=None)
 
     '''--> retrive and test tfRecords'''
     # tf_record_util = TFRecordUtility(WflwConf.num_of_landmarks*2)
@@ -68,18 +68,18 @@ if __name__ == '__main__':
     #             weight_fname='weights-94--0.01342.h5', has_pose=True, customLoss=False)
 
     '''--> Train Model'''
-    fg = FacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model',
-                   cord_regressor_arch='cord_reg_model',
-                   hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
-
-                   hm_regressor_weight=None, cord_regressor_weight=None,
-                   hm_discriminator_weight=None, cord_discriminator_weight=None,
-
-                   input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                   input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-
-                   input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
-                   # we concat flatten hm and img
-                   input_shape_cord_disc=IbugConf.num_of_landmarks * 2)  # concat 2 generated and real array
-    fg.train()
+    # fg = FacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model',
+    #                cord_regressor_arch='cord_reg_model',
+    #                hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
+    #
+    #                hm_regressor_weight=None, cord_regressor_weight=None,
+    #                hm_discriminator_weight=None, cord_discriminator_weight=None,
+    #
+    #                input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #                input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #
+    #                input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
+    #                # we concat flatten hm and img
+    #                input_shape_cord_disc=IbugConf.num_of_landmarks * 2)  # concat 2 generated and real array
+    # fg.train()
     # fg.train_network()
