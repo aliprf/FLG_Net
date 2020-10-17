@@ -35,7 +35,6 @@ import efficientnet.tfkeras as efn
 
 class CNNModel:
     def get_model(self, input_tensor, arch, num_landmark, num_face_graph_elements, input_shape):
-
         if arch == 'effGlassNet':
             model = self.create_effGlassNet(input_shape=input_shape, input_tensor=input_tensor,
                                             num_landmark=num_landmark, num_face_graph_elements=num_face_graph_elements)
@@ -50,9 +49,9 @@ class CNNModel:
             model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor,
                                                num_landmark=num_landmark)
         elif arch == 'hm_Disc_model':
-            model = self.create_hm_disc_model(input_shape=input_shape, input_tensor=input_tensor)
+            model = self.create_hm_disc_model(num_landmark=num_landmark)
         elif arch == 'cord_Disc_model':
-            model = self.create_cord_disc_model(input_shape=input_shape, input_tensor=input_tensor)
+            model = self.create_cord_disc_model(input_shape=input_shape)
 
         return model
 
@@ -229,7 +228,7 @@ class CNNModel:
             json_file.write(model_json)
         return eff_net
 
-    def create_cord_disc_model(self, input_shape, input_tensor):
+    def create_cord_disc_model(self, input_shape):
         initializer = tf.random_normal_initializer(0., 0.02)
 
         inputs = tf.keras.Input(shape=(input_shape,))
@@ -255,7 +254,7 @@ class CNNModel:
             json_file.write(model_json)
         return model
 
-    def create_hm_disc_model(self, input_shape, input_tensor):
+    def create_hm_disc_model(self, num_landmark):
         initializer = tf.random_normal_initializer(0., 0.02)
         '''converting img{224, 224, 3} to {56, 56, 1}'''
         imgInput = Input(shape=(224, 224, 3))
@@ -264,8 +263,8 @@ class CNNModel:
         img_avg = tf.keras.layers.Reshape((56, 56, 1))(img_avg)
 
         '''converting hm{56, 56, 68} to {56, 56, 1}'''
-        hmInput = Input(shape=(56, 56, 68))
-        hmInput_avg = tf.keras.layers.Average()([hmInput[:, :, :, i] for i in range(68)])
+        hmInput = Input(shape=(56, 56, num_landmark//2))
+        hmInput_avg = tf.keras.layers.Average()([hmInput[:, :, :, i] for i in range(num_landmark//2)])
         hmInput_avg = tf.keras.layers.Reshape((56, 56, 1))(hmInput_avg)
 
         '''concat image and hm '''

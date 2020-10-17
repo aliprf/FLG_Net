@@ -366,10 +366,10 @@ class FacialGAN:
         cord_reg_model = self.make_cord_generator_model()
         cord_disc_model = self.make_cord_discriminator_model()
 
-        hm_reg_optimizer = self._get_optimizer(lr=2e-5)
-        hm_disc_optimizer = self._get_optimizer(lr=2e-8)
-        cord_reg_optimizer = self._get_optimizer(lr=2e-5)
-        cord_disc_optimizer = self._get_optimizer(lr=2e-8)
+        hm_reg_optimizer = self._get_optimizer(lr=2e-4)
+        hm_disc_optimizer = self._get_optimizer(lr=2e-7)
+        cord_reg_optimizer = self._get_optimizer(lr=2e-4)
+        cord_disc_optimizer = self._get_optimizer(lr=2e-7)
 
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
