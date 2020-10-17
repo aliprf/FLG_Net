@@ -150,9 +150,14 @@ class CNNModel:
         '''out heatmap regression'''
         # out_heatmap = Conv2D(num_landmark // 2, kernel_size=1, padding='same', name='O_hm')(x)
 
-        '''out NEW2'''
         out_heatmap = Conv2DTranspose(num_landmark // 2, 4, strides=1, padding='same',
                             kernel_initializer=initializer, activation='tanh')(x)  # 56, 56, 256
+
+        '''out NEW2'''
+        # x = Conv2DTranspose(num_landmark, 4, strides=1, padding='same',
+        #                     kernel_initializer=initializer)(x)  # 56, 56, 256
+        #
+        # out_heatmap = Conv2D(num_landmark // 2, kernel_size=1, padding='same', name='O_hm')(x)
 
         eff_net = Model(inp, [out_heatmap])
         eff_net.summary()
@@ -164,19 +169,19 @@ class CNNModel:
 
     def create_cord_reg_model(self, input_shape, input_tensor, num_landmark):
         res = resnet50.ResNet50(include_top=True,
-                                     weights=None,
-                                     input_tensor=input_tensor,
-                                     input_shape=input_shape,
-                                     pooling=None,
-                                     classes=num_landmark)  # or weights='noisy-student' GlobalAveragePooling2
+                                weights=None,
+                                input_tensor=input_tensor,
+                                input_shape=input_shape,
+                                pooling=None,
+                                classes=num_landmark)  # or weights='noisy-student' GlobalAveragePooling2
         # res.summary()
         res.layers.pop()
         initializer = tf.random_normal_initializer(0., 0.02)
 
         x = res.get_layer('avg_pool').output  # 1280
-        x = Dense(num_landmark, name='dense_layer_out_2', activation='relu',
-                  kernel_initializer=initializer, use_bias=False)(x)
+        # x = Dense(num_landmark, name='dense_layer_out_2', activation='relu', kernel_initializer=initializer, use_bias=False)(x)
         out = Dense(num_landmark, activation='linear', name='out', kernel_initializer=initializer, use_bias=False)(x)
+        out = Dense(num_landmark, name='out', use_bias=False)(x)
         inp = res.input
 
         revised_model = Model(inp, out)
@@ -252,34 +257,34 @@ class CNNModel:
 
     def create_hm_disc_model(self, input_shape, input_tensor):
         initializer = tf.random_normal_initializer(0., 0.02)
-
+        '''converting img{224, 224, 3} to {56, 56, 1}'''
         imgInput = Input(shape=(224, 224, 3))
         img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
         img_avg = tf.keras.layers.Average()([img_resized[:, :, :, 0], img_resized[:, :, :, 1], img_resized[:, :, :,  2]])
         img_avg = tf.keras.layers.Reshape((56, 56, 1))(img_avg)
 
+        '''converting hm{56, 56, 68} to {56, 56, 1}'''
         hmInput = Input(shape=(56, 56, 68))
         hmInput_avg = tf.keras.layers.Average()([hmInput[:, :, :, i] for i in range(68)])
         hmInput_avg = tf.keras.layers.Reshape((56, 56, 1))(hmInput_avg)
+
+        '''concat image and hm '''
         concat_inp = tf.keras.layers.concatenate([hmInput_avg, img_avg])
-        x = self.downsample(64, 4, 1, False)(concat_inp)
-        x = self.downsample(64, 4, 1)(x)
-        x = self.downsample(64, 4, 2)(x)
+        x = self.downsample(64, 4, 1, False)(concat_inp)  # (bs, 56, 56, 64)
+        x = self.downsample(128, 4, 1)(x)  # (bs, 56, 56, 128)
+        x = self.downsample(128, 4, 2)(x)  # (bs, 28, 28, 128)
 
-        x = self.downsample(128, 4, 1)(x)
-        x = self.downsample(128, 4, 2)(x)
+        x = self.downsample(256, 4, 1)(x)  # (bs, 28, 28, 256)
+        x = self.downsample(256, 4, 2)(x)  # (bs, 14, 14, 256)
+        x = tf.keras.layers.ZeroPadding2D()(x)  # (bs, 16, 16, 256)
 
-        x = self.downsample(256, 4, 1)(x)
-        x = self.downsample(256, 4, 2)(x)
+        x = self.downsample(512, 4, 2)(x)  # (bs, 8, 8, 512)
+        x = self.downsample(512, 4, 1)(x)  # (bs, 4, 4, 512)
+        last = tf.keras.layers.Conv2D(1, 4, strides=1,
+                                      kernel_initializer=initializer)(x)  # (bs, 4, 4, 1)
 
-        x = self.downsample(512, 4, 1)(x)
-        x = self.downsample(512, 4, 2)(x)
-
-        x = self.downsample(1024, 4, 2)(x)
-
-        x = Dropout(0.3)(x)
-        x = Flatten()(x)
-        last = Dense(1, activation='sigmoid', kernel_initializer=initializer, use_bias=False)(x)
+        # x = Flatten()(x)
+        # last = Dense(1, activation='sigmoid', kernel_initializer=initializer, use_bias=False)(x)
 
         model = tf.keras.Model(inputs=[imgInput, hmInput], outputs=last)
         model.summary()
