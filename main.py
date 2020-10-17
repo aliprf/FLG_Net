@@ -72,7 +72,7 @@ if __name__ == '__main__':
                    cord_regressor_arch='cord_reg_model',
                    hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
 
-                   hm_regressor_weight=None, cord_regressor_weight='./training_checkpoints/',
+                   hm_regressor_weight=None, cord_regressor_weight=None,
                    hm_discriminator_weight=None, cord_discriminator_weight=None,
 
                    input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
