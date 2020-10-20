@@ -233,7 +233,7 @@ class FacialGAN:
         loss_discrimination = cross_entropy(tf.ones_like(hm_pr_arr[3]), hm_pr_arr[3])
 
         '''calculating hm_pr VS points_gr loss'''
-        if epoch < 25:
+        if epoch < 20:
             loss_regression = w_reg_loss * loss_reg
         else:
             loss_hm_conv = self.calc_pts_to_hm_MAE(hm=hm_pr_arr[3], hm_pr_conv=hm_pr_conv, epoch=epoch)
@@ -247,7 +247,7 @@ class FacialGAN:
     def coord_regressor_loss(self, pnt_gr, pnt_pr, pnt_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
-        w_reg_loss = 200
+        w_reg_loss = 100
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         mse = tf.keras.losses.MeanSquaredError()
@@ -257,7 +257,7 @@ class FacialGAN:
         loss_discrimination = cross_entropy(tf.ones_like(pnt_pr), pnt_pr)
 
         '''calculating hm_pr VS points_gr loss'''
-        if epoch < 25:
+        if epoch < 20:
             loss_regression = w_reg_loss * loss_reg
         else:
             loss_pts_conv = self.calc_hm_to_pts_MAE(pnt_pr_conv=pnt_pr_conv, pts=pnt_pr, epoch=epoch)
@@ -271,7 +271,7 @@ class FacialGAN:
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         real_loss = cross_entropy(tf.ones_like(real_output), real_output)
         fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
-        if epoch > 25:
+        if epoch > 20:
             fake_conv_loss = cross_entropy(tf.zeros_like(fake_cord_conv), fake_cord_conv)
         else:
             fake_conv_loss = 0
@@ -292,7 +292,7 @@ class FacialGAN:
             points_pr = cord_reg_model(images)
 
             '''showing the results'''
-            if True or step > 0 and step % 200 == 0:
+            if step > 0 and step % 100 == 0:
                 self.print_hm_cord(epoch, step, images, heatmaps_gr, heatmaps_pr, points_gr, points_pr)
 
             '''conversion'''
