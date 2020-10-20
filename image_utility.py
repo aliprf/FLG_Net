@@ -72,25 +72,53 @@ class ImageUtility:
         except Exception as e:
             print(e)
 
+    def flip(self, img, _label, num_of_landmarks,):
+        t_matrix = np.array([
+            [-1, -1, InputDataSize.image_input_size],
+            [1, 1, 0],
+            [0, 0, 1]
+        ])
+        landmark_arr_xy, landmark_arr_x, landmark_arr_y = self.create_landmarks(_label, 1, 1)
+        label = np.array(landmark_arr_x + landmark_arr_y).reshape([2, num_of_landmarks])
+        marging = np.ones([1, num_of_landmarks])
+        label = np.concatenate((label, marging), axis=0)
+
+        t_label = self._reorder(np.delete(np.dot(t_matrix, label), 2, axis=0).reshape([2 * num_of_landmarks]),
+                                num_of_landmarks)
+        img = np.fliplr(img)
+
+        xy_points, x_points, y_points = self.create_landmarks(landmarks=t_label,
+                                                              scale_factor_x=1, scale_factor_y=1)
+        self.print_image_arr(str(y_points[0]), img, x_points, y_points)
+
+
     def random_rotate(self, _image, _label, file_name, num_of_landmarks, dataset_name):
         try:
+            # self.flip(_image, _label, num_of_landmarks)
+            # return 0
 
-            xy_points, x_points, y_points = self.create_landmarks(landmarks=_label,
-                                                                  scale_factor_x=1, scale_factor_y=1)
+            # xy_points, x_points, y_points = self.create_landmarks(landmarks=_label,
+            #                                                       scale_factor_x=1, scale_factor_y=1)
             # self.print_image_arr(str(xy_points[8]), _image, x_points, y_points)
-
             # _image, _label = self.cropImg_2time(_image, x_points, y_points)
 
             _image = self._noisy(_image)
 
-            if random.randint(0, 4) <= 1:
-                _image = self._change_color(_image)
+            # if random.randint(0, 4) <= 1:
+            #     _image = self._change_color(_image)
 
-            scale = (np.random.uniform(0.75, 1.0), np.random.uniform(0.75, 1.0))
+            scale = (np.random.uniform(0.75, 1.1), np.random.uniform(0.75, 1.1))
 
-            rot = np.random.uniform(-1 * 0.80, 0.80)
+            rot = np.random.uniform(-1 * 0.75, 0.75)
             translation = (0, 0)
             shear = 0
+
+            sx, sy = scale
+            t_matrix = np.array([
+                [sx * math.cos(rot), -sy * math.sin(rot + shear), 0],
+                [sx * math.sin(rot), sy * math.cos(rot + shear), 0],
+                [0, 0, 1]
+            ])
 
             tform = AffineTransform(
                 scale=scale,  # ,
@@ -100,22 +128,15 @@ class ImageUtility:
             )
 
             output_img = transform.warp(_image, tform.inverse, mode='symmetric')
+            # output_img = transform.warp(_image, t_matrix, mode='symmetric')
+            # output_img = np.dot(t_matrix, _image)
 
-            sx, sy = scale
-            t_matrix = np.array([
-                [sx * math.cos(rot), -sy * math.sin(rot + shear), 0],
-                [sx * math.sin(rot), sy * math.cos(rot + shear), 0],
-                [0, 0, 1]
-            ])
             landmark_arr_xy, landmark_arr_x, landmark_arr_y = self.create_landmarks(_label, 1, 1)
             label = np.array(landmark_arr_x + landmark_arr_y).reshape([2, num_of_landmarks])
             marging = np.ones([1, num_of_landmarks])
             label = np.concatenate((label, marging), axis=0)
 
-            label_t = np.dot(t_matrix, label)
-            lbl_flat = np.delete(label_t, 2, axis=0).reshape([2*num_of_landmarks])
-
-            t_label = self._reorder(lbl_flat, num_of_landmarks)
+            t_label = self._reorder(np.delete(np.dot(t_matrix, label), 2, axis=0).reshape([2*num_of_landmarks]),num_of_landmarks)
 
             '''crop data: we add a small margin to the images'''
             xy_points, x_points, y_points = self.create_landmarks(landmarks=t_label,
@@ -141,15 +162,15 @@ class ImageUtility:
             min_b = 0.0
             max_b = InputDataSize.image_input_size
             if dataset_name == DatasetName.cofw:
-                min_b = 5.0
-                max_b = 214
+                min_b = 10.
+                max_b = InputDataSize.image_input_size - 20
 
             if not(min(landmark_arr_x) < 0 or min(landmark_arr_y) < min_b or
                    max(landmark_arr_x) > InputDataSize.image_input_size or max(landmark_arr_y) > max_b):
 
-                # self.print_image_arr(str(landmark_arr_x[0]), resized_img, landmark_arr_x, landmark_arr_y)
-
-                im = Image.fromarray((resized_img * 255).astype(np.uint8))
+                self.print_image_arr(str(landmark_arr_x[0]), resized_img, landmark_arr_x, landmark_arr_y)
+                #
+                im = Image.fromarray(np.round(resized_img*255).astype(np.uint8))
                 im.save(str(file_name) + '.jpg')
 
                 pnt_file = open(str(file_name) + ".pts", "w")
@@ -486,10 +507,10 @@ class ImageUtility:
         return crop, new_xy_s
 
     def cropImg(self, img, x_s, y_s, no_padding=False):
-        margin1 = random.randint(0, 10)
-        margin2 = random.randint(0, 10)
-        margin3 = random.randint(0, 10)
-        margin4 = random.randint(0, 10)
+        margin1 = random.randint(10, 25)
+        margin2 = random.randint(10, 25)
+        margin3 = random.randint(10, 25)
+        margin4 = random.randint(10, 25)
 
         if no_padding:
             min_x = max(0, int(min(x_s)))

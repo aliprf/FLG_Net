@@ -31,23 +31,17 @@ class LearningConfig:
     MIN_LR = 1e-7
     MAX_LR = 1e-2
     STEP_SIZE = 10
-    batch_size = 40
+    batch_size = 2
     steps_per_validation_epochs = 5
     epochs = 200
 
 
 class InputDataSize:
-    image_input_size = 224
-    img_center = image_input_size // 2  # 112
+    image_input_size = 256
+    img_center = image_input_size // 2  # 128
 
-    hm_size = image_input_size // 4  # 56
-    hm_center = hm_size // 2  # 28
-
-    # landmark_face_len = 54
-    # landmark_nose_len = 18
-    # landmark_eys_len = 24
-    # landmark_mouth_len = 40
-    # pose_len = 3
+    hm_size = image_input_size // 4  # 64
+    hm_center = hm_size // 2  # 64
 
 
 class AffectnetConf:
@@ -91,9 +85,9 @@ class W300Conf:
 
 
 class WflwConf:
-    # Wflw_prefix_path = '/media/data3/ali/FL/wflw/'  # --> Zeus
+    Wflw_prefix_path = '/media/data3/ali/FL/wflw/'  # --> Zeus
     # Wflw_prefix_path = '/media/data2/alip/FL/wflw/'  # --> Atlas
-    Wflw_prefix_path = '/media/ali/data/wflw/'  # --> local
+    # Wflw_prefix_path = '/media/ali/data/wflw/'  # --> local
 
     img_path_prefix = Wflw_prefix_path + 'all/'
     # rotated_img_path_prefix = Wflw_prefix_path + '0_rotated/'
@@ -137,7 +131,7 @@ class WflwConf:
     number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
     augmentation_factor = 4  # create . image from 4
-    augmentation_factor_rotate = 15  # create . image from 15
+    augmentation_factor_rotate = 20  # create . image from 15
     num_of_landmarks = 98
     num_face_graph_elements = 8
     hm_stride = 2
@@ -175,7 +169,7 @@ class CofwConf:
     number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
     augmentation_factor = 5  # create . image from 1
-    augmentation_factor_rotate = 30  # create . image from 1
+    augmentation_factor_rotate = 40  # create . image from 1
     num_of_landmarks = 28
     num_face_graph_elements = 8
     hm_stride = 3
@@ -215,7 +209,7 @@ class IbugConf:
     number_of_evaluation_sample = int(number_of_all_sample * 0.05)  # 5% for evaluation
 
     augmentation_factor = 4  # create . image from 1
-    augmentation_factor_rotate = 20  # create . image from 1
+    augmentation_factor_rotate = 35  # create . image from 1
     num_of_landmarks = 68
     num_face_graph_elements = 9
     hm_stride = 2

@@ -20,39 +20,37 @@ import matplotlib.pyplot as plt
 
 class Test:
 
-    def __init__(self, dataset_name, arch, num_output_layers, weight_fname, customLoss, has_pose=False):
+    def __init__(self, dataset_name, weight_fname):
         if dataset_name is None:
             return
 
         self.dataset_name = dataset_name
-        self.has_pose = has_pose
-        self.num_output_layers = num_output_layers
-        self.arch = arch
-        self.customLoss = customLoss
 
         if dataset_name == DatasetName.ibug_test:
-            self.output_len = IbugConf.num_of_landmarks * 2
+            self.num_landmark = IbugConf.num_of_landmarks * 2
         elif dataset_name == DatasetName.cofw_test:
-            self.output_len = CofwConf.num_of_landmarks * 2
+            self.num_landmark = CofwConf.num_of_landmarks * 2
         elif dataset_name == DatasetName.wflw_test:
-            self.output_len = WflwConf.num_of_landmarks * 2
+            self.num_landmark = WflwConf.num_of_landmarks * 2
 
         cnn = CNNModel()
-        detect = PoseDetector()
-        model = cnn.get_model(train_images=None, arch=arch,
-                              num_output_layers=num_output_layers, output_len=self.output_len)
+        model = cnn.get_model(input_tensor=None, arch='cord_reg_model', num_landmark=self.num_landmark,
+                              input_shape=[224, 224,3], num_face_graph_elements=None)
+
         if weight_fname is not None:
             model.load_weights(weight_fname)
 
-        if dataset_name == DatasetName.ibug_test:
-            print(dataset_name + " _ " + arch + " _ " + str(customLoss) + ": \r\n" + str(self._test_on_W300(detect, model)))
-        elif dataset_name == DatasetName.cofw_test:
-            print(dataset_name + " _ " + arch + " _ " + str(customLoss) + ": \r\n" + str(self._test_on_COFW(detect, model)))
-        elif dataset_name == DatasetName.wflw_test:
-            print(dataset_name + " _ " + arch + " _ " + str(customLoss) + ": \r\n" + str(self._test_on_WFLW(detect, model)))
+        arch= ''
 
-    def _test_on_WFLW(self, detect, model):
-        tf_record_utility = TFRecordUtility(self.output_len)
+        if dataset_name == DatasetName.ibug_test:
+            print(dataset_name + " _ " + arch + " _ : \r\n" + str(self._test_on_W300(model)))
+        elif dataset_name == DatasetName.cofw_test:
+            print(dataset_name + " _ " + arch + " _ : \r\n" + str(self._test_on_COFW(model)))
+        elif dataset_name == DatasetName.wflw_test:
+            print(dataset_name + " _ " + arch + " _ : \r\n" + str(self._test_on_WFLW(model)))
+
+    def _test_on_WFLW(self, model):
+        tf_record_utility = TFRecordUtility(self.num_landmark)
 
         result_str = ''
 
@@ -75,7 +73,7 @@ class Test:
             tfrecord_filename=WflwConf.tf_test_path_largepose,
             number_of_records=WflwConf.orig_of_all_test_largepose,
             only_label=False)
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model, WflwConf.orig_of_all_test_largepose,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model, WflwConf.orig_of_all_test_largepose,
                                                                             img_arr_largepose, lbl_arr_largepose)
         result_str += '\n\r\n\r-------------------------_test_on_WFLW: largepose------------------------------------nme: '\
                       + str(nme)+'fr: ' + str(fr) + 'auc: '+ str(auc) + '\n\r' + 'mae_yaw: '+ str(mae_yaw)+ 'mae_pitch: '\
@@ -89,7 +87,7 @@ class Test:
             tfrecord_filename=WflwConf.tf_test_path_occlusion,
             number_of_records=WflwConf.orig_of_all_test_occlusion,
             only_label=False)
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model, WflwConf.orig_of_all_test_occlusion,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model, WflwConf.orig_of_all_test_occlusion,
                                                                             img_arr_occlusion, lbl_arr_occlusion)
         result_str += '\n\r\n\r-------------------------_test_on_WFLW _occlusion------------------------------------'+ '\n\r' \
                       + 'nme: '+ str(nme)+ 'fr: '+ str(fr)+ 'auc: '+ str(auc) + '\n\r' \
@@ -104,7 +102,7 @@ class Test:
             tfrecord_filename=WflwConf.tf_test_path_makeup,
             number_of_records=WflwConf.orig_of_all_test_makeup,
             only_label=False)
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model, WflwConf.orig_of_all_test_makeup,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model, WflwConf.orig_of_all_test_makeup,
                                                                             img_arr_makeup, lbl_arr_makeup)
         result_str += '\n\r\n\r-------------------------_test_on_WFLW_makeup------------------------------------' + '\n\r' \
                       + 'nme: '+ str(nme)+ 'fr: '+ str(fr)+ 'auc: '+ str(auc) + '\n\r' \
@@ -113,12 +111,11 @@ class Test:
         print('mae_yaw: '+ str(mae_yaw)+ 'mae_pitch: '+ str(mae_pitch)+ 'mae_roll: '+ str(mae_roll))
         print("-------------------------------------------------------------")
 
-
         lbl_arr_expression, img_arr_expression = tf_record_utility.retrieve_tf_record_test_set(
             tfrecord_filename=WflwConf.tf_test_path_expression,
             number_of_records=WflwConf.orig_of_all_test_expression,
             only_label=False)
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model, WflwConf.orig_of_all_test_expression,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model, WflwConf.orig_of_all_test_expression,
                                                                             img_arr_expression, lbl_arr_expression)
         result_str += '\n\r\n\r-------------------------_test_on_WFLW_expression------------------------------------' + '\n\r' \
                       + 'nme: '+ str(nme)+ 'fr: '+ str(fr)+ 'auc: '+ str(auc) + '\n\r' \
@@ -132,7 +129,7 @@ class Test:
             tfrecord_filename=WflwConf.tf_test_path_illumination,
             number_of_records=WflwConf.orig_of_all_test_illumination,
             only_label=False)
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model, WflwConf.orig_of_all_test_illumination,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model, WflwConf.orig_of_all_test_illumination,
                                                                             img_arr_illumination, lbl_arr_illumination)
 
         result_str += '\n\r\n\r-------------------------_test_on_WFLW _illumination ------------------------------------' + '\n\r' \
@@ -147,7 +144,7 @@ class Test:
             tfrecord_filename=WflwConf.tf_test_path_blur,
             number_of_records=WflwConf.orig_of_all_test_blur,
             only_label=False)
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model, WflwConf.orig_of_all_test_blur,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model, WflwConf.orig_of_all_test_blur,
                                                                             img_arr_blur, lbl_arr_blur)
 
         result_str += '\n\r\n\r-------------------------_test_on_WFLW_blur------------------------------------' + '\n\r' \
@@ -160,7 +157,7 @@ class Test:
 
         return result_str
 
-    def _test_on_COFW(self, detect, model):
+    def _test_on_COFW(self, model):
         tf_record_utility = TFRecordUtility(self.output_len)
         lbl_arr_total, img_arr_total = tf_record_utility.retrieve_tf_record_test_set(
             tfrecord_filename=CofwConf.tf_test_path,
@@ -169,7 +166,7 @@ class Test:
         lbl_arr_total = np.array(lbl_arr_total)
         img_arr_total = np.array(img_arr_total)
 
-        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(detect, model,
+        nme, fr, auc, mae_yaw, mae_pitch, mae_roll = self._calculate_errors(model,
                                                                             CofwConf.orig_number_of_test,
                                                                             img_arr_total, lbl_arr_total)
 
@@ -183,15 +180,26 @@ class Test:
 
         return result_str
 
-    def _test_on_W300(self, detect, model):
-        tf_record_utility = TFRecordUtility(self.output_len)
-        lbl_arr_common, img_arr_common = tf_record_utility.retrieve_tf_record_test_set(
-            tfrecord_filename=IbugConf.tf_test_path_common,
-            number_of_records=IbugConf.orig_number_of_test_common,
-            only_label=False)
+    def _test_on_W300(self, model):
+        tf_record_utility = TFRecordUtility(self.num_landmark)
+
         lbl_arr_challenging, img_arr_challenging = tf_record_utility.retrieve_tf_record_test_set(
             tfrecord_filename=IbugConf.tf_test_path_challenging,
             number_of_records=IbugConf.orig_number_of_test_challenging,
+            only_label=False)
+
+        nme_ch, fr_ch, auc_ch, mae_yaw_ch, mae_pitch_ch, mae_roll_ch = self._calculate_errors(model, W300Conf.number_of_all_sample_challenging,
+            img_arr_challenging, lbl_arr_challenging)
+
+        lbl_arr_challenging = np.array(lbl_arr_challenging)
+        img_arr_challenging = np.array(img_arr_challenging)
+
+        print('nme_ch: ', str(nme_ch), 'fr_ch: ', str(fr_ch), 'auc_ch: ', str(auc_ch))
+        print('mae_yaw: ', str(mae_yaw_ch), 'mae_pitch: ', str(mae_pitch_ch), 'mae_roll: ', str(mae_roll_ch))
+
+        lbl_arr_common, img_arr_common = tf_record_utility.retrieve_tf_record_test_set(
+            tfrecord_filename=IbugConf.tf_test_path_common,
+            number_of_records=IbugConf.orig_number_of_test_common,
             only_label=False)
 
         lbl_arr_full, img_arr_full = tf_record_utility.retrieve_tf_record_test_set(
@@ -199,8 +207,6 @@ class Test:
             number_of_records=IbugConf.orig_number_of_test_full,
             only_label=False)
 
-        lbl_arr_challenging = np.array(lbl_arr_challenging)
-        img_arr_challenging = np.array(img_arr_challenging)
 
         lbl_arr_common = np.array(lbl_arr_common)
         img_arr_common = np.array(img_arr_common)
@@ -208,22 +214,14 @@ class Test:
         lbl_arr_full = np.array(lbl_arr_full)
         img_arr_full = np.array(img_arr_full)
 
-        nme_ch, fr_ch, auc_ch, mae_yaw_ch, mae_pitch_ch, mae_roll_ch = self._calculate_errors(
-            detect, model, W300Conf.number_of_all_sample_challenging,
-            img_arr_challenging, lbl_arr_challenging)
 
-        print('nme_ch: ', str(nme_ch), 'fr_ch: ', str(fr_ch), 'auc_ch: ', str(auc_ch))
-        print('mae_yaw: ', str(mae_yaw_ch), 'mae_pitch: ', str(mae_pitch_ch), 'mae_roll: ', str(mae_roll_ch))
-
-        nme_c, fr_c, auc_c, mae_yaw_c, mae_pitch_c, mae_roll_c = self._calculate_errors(detect,
-                                                                                        model,
+        nme_c, fr_c, auc_c, mae_yaw_c, mae_pitch_c, mae_roll_c = self._calculate_errors(model,
                                                                                         W300Conf.number_of_all_sample_common,
                                                                                         img_arr_common, lbl_arr_common)
         print('nme_c: ', str(nme_c), 'fr_c: ', str(fr_c), 'auc_c: ', str(auc_c))
         print('mae_yaw: ', str(mae_yaw_c), 'mae_pitch: ', str(mae_pitch_c), 'mae_roll: ', str(mae_roll_c))
 
-        nme_f, fr_f, auc_f, mae_yaw_f, mae_pitch_f, mae_roll_f = self._calculate_errors(detect,
-                                                                                        model,
+        nme_f, fr_f, auc_f, mae_yaw_f, mae_pitch_f, mae_roll_f = self._calculate_errors(model,
                                                                                         W300Conf.number_of_all_sample_full,
                                                                                         img_arr_full, lbl_arr_full)
         print('nme_f: ', str(nme_f), 'fr_f: ', str(fr_f), 'auc_f: ', str(auc_f))
@@ -243,7 +241,7 @@ class Test:
         self.num_output_layers = num_output_layers
 
         cnn = CNNModel()
-        detect = PoseDetector()
+        detect = None
 
         f_names = [f for f in listdir(weight_path) if isfile(join(weight_path, f))]
         # cofw_ds_asm
@@ -290,7 +288,7 @@ class Test:
         print(res_cofw)
         print(res_wflw)
 
-    def _calculate_errors(self, detect, model, number_test_set, test_img_arr, test_lbl_arr):
+    def _calculate_errors(self,model, number_test_set, test_img_arr, test_lbl_arr):
         fr_threshold = 0.1
 
         fail_counter = 0
@@ -303,7 +301,7 @@ class Test:
         nme_arr = []
         for i in tqdm(range(number_test_set)):
             loss, lt, lp, yaw, pitch, roll = \
-                self._test_result_per_image(i, model, test_img_arr[i], test_lbl_arr[i], detect)
+                self._test_result_per_image(i, model, test_img_arr[i], test_lbl_arr[i])
             sum_loss += loss
             nme_arr.append(loss)
 
@@ -333,17 +331,13 @@ class Test:
 
         return nme, fr, AUC, mae_yaw, mae_pitch, mae_roll
 
-    def _test_result_per_image(self, counter, model, img, labels_true, detect):
+    def _test_result_per_image(self, counter, model, img, labels_true):
         image_utility = ImageUtility()
-        image = np.expand_dims(img, axis=0)
+        image = np.expand_dims(img*255, axis=0)
         predict = model.predict(image)
 
-        if self.arch == 'mobileNetV2_nopose' or 'efficientNet':
-            pre_points = predict[0]
-            pose_predicted = [0, 0, 0]
-        else:
-            pre_points = predict[0][0]
-            pose_predicted = predict[1][0]
+        pre_points = predict[0]
+        pose_predicted = [0, 0, 0]
 
         # pre_points = pre_points.reshape([196])
 
@@ -397,56 +391,18 @@ class Test:
             error = math.sqrt(((x_point_predicted - x_point_true) ** 2) + ((y_point_predicted - y_point_true) ** 2))
             sum_errors += error
 
-        normalized_mean_error = sum_errors / (normalizing_distance * (self.output_len / 2))
+        normalized_mean_error = sum_errors / (normalizing_distance * (self.num_landmark / 2))
         # print(normalized_mean_error)
         # print('=====')
 
-        lp = np.array(labels_predict_transformed).reshape([self.output_len // 2, 2])
-        lt = np.array(labels_true_transformed).reshape([self.output_len // 2, 2])
+        lp = np.array(labels_predict_transformed).reshape([self.num_landmark // 2, 2])
+        lt = np.array(labels_true_transformed).reshape([self.num_landmark // 2, 2])
 
         # print(labels_true_transformed)
         # print(lt)
         # print('---------------')
-
         '''When there is no pose:'''
-        if not self.has_pose:
-            return normalized_mean_error, lt, lp, 0, 0, 0
-
-        '''pose estimation vs hopeNet'''
-        img_cp_1 = np.array(img) * 255.0
-        r, g, b = cv2.split(img_cp_1)
-        img_cp_1 = cv2.merge([b, g, r])
-
-        img_cp_2 = np.array(img) * 255.0
-        r, g, b = cv2.split(img_cp_2)
-        img_cp_2 = cv2.merge([b, g, r])
-
-        # yaw_truth, pitch_truth, roll_truth = 0, 0, 0
-        yaw_truth, pitch_truth, roll_truth = detect.detect(img, isFile=False, show=False)
-
-        yaw_p = pose_predicted[0]
-        pitch_p = pose_predicted[1]
-        roll_p = pose_predicted[2]
-        ''' normalized to normal '''
-        min_degree = - 65
-        max_degree = 65
-        yaw_tpre = min_degree + (max_degree - min_degree) * (yaw_p + 1) / 2
-        pitch_tpre = min_degree + (max_degree - min_degree) * (pitch_p + 1) / 2
-        roll_tpre = min_degree + (max_degree - min_degree) * (roll_p + 1) / 2
-
-        # print("true:  " + str(yaw_truth)+"--"+str(pitch_truth)+"--"+str(roll_truth))
-        # print("predict:  " + str(yaw_tpre)+"--"+str(pitch_tpre)+"--"+str(roll_tpre))
-        #
-        # output_pre = utils.draw_axis(img_cp_1, yaw_tpre, pitch_tpre, roll_tpre, tdx=150, tdy=150, size=150)
-        # output_truth = utils.draw_axis(img_cp_2, yaw_truth, pitch_truth, roll_truth, tdx=150, tdy=150, size=150)
-        # cv2.imwrite(str(counter+1) + "_pose_pre.jpg", output_pre)
-        # cv2.imwrite(str((counter+1)*1000) + "_pose_grt.jpg", output_truth)
-
-        mae_yaw = abs(yaw_tpre - yaw_truth)
-        mae_pitch = abs(pitch_tpre - pitch_truth)
-        mae_roll = abs(roll_tpre - roll_truth)
-        "================================="
-        return normalized_mean_error, lt, lp, mae_yaw, mae_pitch, mae_roll
+        return normalized_mean_error, lt, lp, 0, 0, 0
 
     def calculate_AUC(self, nme_arr, threshold=0.1):
 
@@ -471,7 +427,7 @@ class Test:
 
         plt.xlabel('x', fontsize=16)
         plt.ylabel('y', fontsize=16)
-        plt.savefig(self.dataset_name+'_'+self.arch+'_'+str(self.customLoss)+'.png', bbox_inches='tight')
+        plt.savefig(self.dataset_name+'_.png', bbox_inches='tight')
         plt.clf()
 
         #

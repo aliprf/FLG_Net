@@ -141,8 +141,8 @@ class FacialGAN:
 
     @tf.autograph.experimental.do_not_convert
     def convert_hm_to_pts(self, hm):
-        x_center = 112
-        width = 224
+        x_center = InputDataSize.image_input_size//2
+        width = InputDataSize.image_input_size
         hm_arr = []
         tf_util = TFRecordUtility(self.num_landmark // 2)
 
@@ -169,7 +169,8 @@ class FacialGAN:
         hm_arr = []
         tf_util = TFRecordUtility(self.num_landmark // 2)
         for i in range(LearningConfig.batch_size):
-            hm_t = tf_util.generate_hm_Ten(height=56, width=56, landmarks=pts[i], s=3.0, upsample=True)
+            hm_t = tf_util.generate_hm_Ten(height=InputDataSize.hm_size, width=InputDataSize.hm_size, landmarks=pts[i],
+                                           s=3.0, upsample=True)
             hm_arr.append(hm_t)
         hm_pts = tf.convert_to_tensor(np.array(hm_arr))
         return hm_pts
@@ -209,27 +210,33 @@ class FacialGAN:
 
         return real_loss, fake_loss, fake_conv_loss, total_loss
 
-    def hm_regressor_loss(self, hm_gr, hm_pr, hm_pr_conv, epoch):
+    def hm_regressor_loss(self, hm_gr, hm_pr_arr, hm_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
         w_reg_loss = 10
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        mse = tf.keras.losses.MeanSquaredError()
+        # mse = tf.keras.losses.MeanSquaredError()
+        # loss_reg = mse(hm_gr, hm_pr)
 
         # loss_reg = tf.reduce_mean(tf.abs(hm_gr - hm_pr))
         weights = tf.cast(hm_gr > 0, dtype=tf.float32) * 100 + 1
-        loss_reg = tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr) * weights)
 
-        # loss_reg = mse(hm_gr, hm_pr)
+        loss_reg = tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[0]) * 0.3)
+        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[1]) * 0.5)
+        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[2]) * 0.8)
+        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * 2)
+        # loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * weights)
+        # for hm_pr in hm_pr_arr:
+        #     loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr) * weights)
 
-        loss_discrimination = cross_entropy(tf.ones_like(hm_pr), hm_pr)
+        loss_discrimination = cross_entropy(tf.ones_like(hm_pr_arr[3]), hm_pr_arr[3])
 
         '''calculating hm_pr VS points_gr loss'''
         if epoch < 25:
             loss_regression = w_reg_loss * loss_reg
         else:
-            loss_hm_conv = self.calc_pts_to_hm_MAE(hm=hm_pr, hm_pr_conv=hm_pr_conv, epoch=epoch)
+            loss_hm_conv = self.calc_pts_to_hm_MAE(hm=hm_pr_arr[3], hm_pr_conv=hm_pr_conv, epoch=epoch)
             loss_regression = w_reg_loss * (loss_reg + loss_hm_conv)
 
         '''creating Total loss'''
@@ -279,11 +286,13 @@ class FacialGAN:
         with tf.GradientTape() as hm_reg_tape, tf.GradientTape() as hm_disc_tape, \
                 tf.GradientTape() as cord_reg_tape, tf.GradientTape() as cord_disc_tape:
             '''prediction'''
-            heatmaps_pr = hm_reg_model(images)
+            heatmaps_pr_arr = hm_reg_model(images)
+            heatmaps_pr = heatmaps_pr_arr[3]
+
             points_pr = cord_reg_model(images)
 
             '''showing the results'''
-            if step > 0 and step % 200 == 0:
+            if True or step > 0 and step % 200 == 0:
                 self.print_hm_cord(epoch, step, images, heatmaps_gr, heatmaps_pr, points_gr, points_pr)
 
             '''conversion'''
@@ -302,7 +311,7 @@ class FacialGAN:
 
             '''loss calculation'''
             '''     hm loss'''
-            hm_loss_reg, hm_loss_disc, hm_reg_total_loss = self.hm_regressor_loss(hm_gr=heatmaps_gr, hm_pr=heatmaps_pr,
+            hm_loss_reg, hm_loss_disc, hm_reg_total_loss = self.hm_regressor_loss(hm_gr=heatmaps_gr, hm_pr_arr=heatmaps_pr_arr,
                                                                                   hm_pr_conv=hm_pr_conv, epoch=epoch)
             hm_real_loss, hm_fake_loss, hm_fake_conv_loss, hm_disc_total_loss = self.hm_discriminator_loss(
                 real_output=real_hm, fake_output=fake_hm, fake_hm_conv=fake_hm_conv, epoch=epoch)
@@ -367,9 +376,9 @@ class FacialGAN:
         cord_disc_model = self.make_cord_discriminator_model()
 
         hm_reg_optimizer = self._get_optimizer(lr=2e-4)
-        hm_disc_optimizer = self._get_optimizer(lr=2e-7)
+        hm_disc_optimizer = self._get_optimizer(lr=2e-4)
         cord_reg_optimizer = self._get_optimizer(lr=2e-4)
-        cord_disc_optimizer = self._get_optimizer(lr=2e-7)
+        cord_disc_optimizer = self._get_optimizer(lr=2e-4)
 
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
@@ -411,8 +420,10 @@ class FacialGAN:
             # imgpr.print_image_arr('cgr' + '.' + str(epoch)+"."+str(step)+'.'+str(i), np.zeros([224, 224,3]), landmark_arr_x_n,
             #                       landmark_arr_y_n)
             landmark_arr_flat_n, landmark_arr_x_n, landmark_arr_y_n = image_utility.create_landmarks_from_normalized(
-                points_pr[i], 224, 224, 112, 112)
-            imgpr.print_image_arr('cpr' + '.' + str(epoch) + "." + str(step) + '.' + str(i), np.zeros([224, 224,3]), landmark_arr_x_n,
+                points_pr[i], InputDataSize.image_input_size, InputDataSize.image_input_size,
+                InputDataSize.image_input_size//2, InputDataSize.image_input_size//2)
+            imgpr.print_image_arr('cpr' + '.' + str(epoch) + "." + str(step) + '.' + str(i),
+                                  np.zeros([InputDataSize.image_input_size, InputDataSize.image_input_size,3]), landmark_arr_x_n,
                                   landmark_arr_y_n)
 
     def _create_cord_regressor_net(self, input_tensor, input_shape, is_trainable=True):

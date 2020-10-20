@@ -49,7 +49,7 @@ class TFRecordUtility:
                                 points_arr.append(y)
                             line = fp.readline()
                             cnt += 1
-                    hm = self.generate_hm(56, 56, np.array(points_arr), 1.0, False)
+                    hm = self.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, np.array(points_arr), 1.0, False)
                     img = Image.open(img_file_name)
                     self.calculate_hm_to_point_accuracy(img, hm, points_arr, counter)
                     counter += 1
@@ -124,7 +124,10 @@ class TFRecordUtility:
         counter = 0
         for lbl in lbl_arr:
             landmark_arr_flat_n, landmark_arr_x_n, landmark_arr_y_n = \
-                image_utility.create_landmarks_from_normalized(lbl_arr[counter], 224, 224, 112, 112)
+                image_utility.create_landmarks_from_normalized(lbl_arr[counter], InputDataSize.image_input_size,
+                                                               InputDataSize.image_input_size,
+                                                               InputDataSize.image_input_size//2,
+                                                               InputDataSize.image_input_size//2)
 
             imgpr.print_image_arr(str(counter), img_arr[counter], landmark_arr_x_n, landmark_arr_y_n)
             imgpr.print_image_arr_heat(str(counter+1000), hm_arr[counter], print_single=False)
@@ -143,7 +146,11 @@ class TFRecordUtility:
         counter = 0
         for lbl in lbl_arr:
             landmark_arr_flat_n, landmark_arr_x_n, landmark_arr_y_n = \
-                image_utility.create_landmarks_from_normalized(lbl_arr[counter], 224, 224, 112, 112)
+                image_utility.create_landmarks_from_normalized(lbl_arr[counter],
+                                                               InputDataSize.image_input_size,
+                                                               InputDataSize.image_input_size,
+                                                               InputDataSize.image_input_size//2,
+                                                               InputDataSize.image_input_size//2)
 
             # imgpr.print_image_arr(str(counter), np.zeros([224,224]) , landmark_arr_x_n, landmark_arr_y_n)
             # imgpr.print_image_arr(str(counter)+'_img_', img_arr[counter], [], [])
@@ -415,20 +422,20 @@ class TFRecordUtility:
         return number_of_samples
 
     def retrieve_tf_record_test_set(self, tfrecord_filename, number_of_records, only_label=True):
-        with tf.Session() as sess:
-            filename_queue = tf.train.string_input_producer([tfrecord_filename])
-            image_raw, landmarks, pose = self.__read_and_decode_test_set(filename_queue)
+        with tf.compat.v1.Session() as sess:
+            filename_queue = tf.compat.v1.train.string_input_producer([tfrecord_filename])
+            image_raw, landmarks = self.__read_and_decode_test_set(filename_queue)
 
-            init_op = tf.initialize_all_variables()
+            init_op = tf.compat.v1.initialize_all_variables()
             sess.run(init_op)
             coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(coord=coord)
+            threads = tf.compat.v1.train.start_queue_runners(coord=coord)
 
             img_arr = []
             lbl_arr = []
 
             for i in range(number_of_records):
-                _landmarks, _pose, _image_raw = sess.run([landmarks, pose, image_raw])
+                _landmarks, _image_raw = sess.run([landmarks, image_raw])
                 # _image_raw, _landmarks = sess.run([image_raw, pose, landmarks])
 
                 if not only_label:
@@ -489,10 +496,10 @@ class TFRecordUtility:
         y_indices = tf.cast(indices[:, 1], tf.float32)
         '''weighted average over x and y'''
         w_avg_x = tf.scalar_mul(1 / tf.reduce_sum(weights), tf.reduce_sum([tf.multiply(x_indices, weights)]))
-        w_avg_x = tf.scalar_mul(1 / 56, w_avg_x)
+        w_avg_x = tf.scalar_mul(1 / InputDataSize.hm_size, w_avg_x)
 
         w_avg_y = tf.scalar_mul(1 / tf.reduce_sum(weights), tf.reduce_sum([tf.multiply(y_indices, weights)]))
-        w_avg_y = tf.scalar_mul(1 / 56, w_avg_y)
+        w_avg_y = tf.scalar_mul(1 / InputDataSize.hm_size, w_avg_y)
 
         return tf.stack([w_avg_x, w_avg_y])
 
@@ -530,7 +537,7 @@ class TFRecordUtility:
         # indices = indices[0]
         # return indices[1]*4, indices[0]*4
 
-    def from_heatmap_to_point_tensor(self, heatmaps, number_of_points, scalar=4):  # 56*56*68 => {(x,y), (), }
+    def from_heatmap_to_point_tensor(self, heatmaps, number_of_points, scalar=4):  # InputDataSize.hm_size*InputDataSize.hm_size*68 => {(x,y), (), }
         # x_points = []
         # y_points = []
         # xy_points = []
@@ -551,7 +558,7 @@ class TFRecordUtility:
         #     xy_points.append(y)
         # return np.array(x_points), np.array(y_points), np.array(xy_points)
 
-    def from_heatmap_to_point(self, heatmaps, number_of_points, scalar=4):  # 56*56*68 => {(x,y), (), }
+    def from_heatmap_to_point(self, heatmaps, number_of_points, scalar=4):  # InputDataSize.hm_size*InputDataSize.hm_size*68 => {(x,y), (), }
         """"""
         x_points = []
         y_points = []
@@ -860,7 +867,7 @@ class TFRecordUtility:
                     points_arr_new = meanvector + np.dot(eigenvectors, b_vector_p)
                     points_arr = points_arr_new.tolist()
 
-                hm = self.generate_hm(56, 56, np.array(points_arr), 2, False)
+                hm = self.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, np.array(points_arr), 2, False)
                 hm_f = npy_dir + file_name_save
 
                 # imgpr.print_image_arr_heat(counter, hm, print_single=True)
@@ -923,7 +930,7 @@ class TFRecordUtility:
 
     def __parse_function_reduced(self, proto):
         keys_to_features = {'landmarks': tf.FixedLenFeature([self.number_of_landmark], tf.float32),
-                            'heatmap': tf.FixedLenFeature([56, 56, 68], tf.float32),
+                            'heatmap': tf.FixedLenFeature([InputDataSize.hm_size, InputDataSize.hm_size, 68], tf.float32),
                             'image_raw': tf.FixedLenFeature([InputDataSize.image_input_size,
                                                              InputDataSize.image_input_size, 3], tf.float32)}
 
@@ -1591,7 +1598,7 @@ class TFRecordUtility:
                 #     create_landmarks_from_normalized(landmark_arr_flat_normalized, 224, 224, 112, 112)
                 # imgpr.print_image_arr((i*100)+(k+1), resized_img_new, landmark_arr_x_n, landmark_arr_y_n)
 
-                # heatmap_landmark = self.generate_hm(56, 56, landmark_arr_flat_normalized, s=1.0)
+                # heatmap_landmark = self.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, landmark_arr_flat_normalized, s=1.0)
 
                 # imgpr.print_image_arr_heat((i + 1) * (k + 1), heatmap_landmark)
                 # imgpr.print_image_arr((i * 100) + (k + 1), heatmap_landmark_all, [], [])
@@ -1854,15 +1861,19 @@ class TFRecordUtility:
                     landmark = self._get_asm(landmark, dataset_name, accuracy)
 
                 '''test image '''
-                landmark_arr_xy, landmark_arr_x, landmark_arr_y = img_utils.create_landmarks_from_normalized(landmark, 224, 224, 112, 112)
+                landmark_arr_xy, landmark_arr_x, landmark_arr_y = \
+                    img_utils.create_landmarks_from_normalized(landmark, InputDataSize.image_input_size,
+                                                               InputDataSize.image_input_size,
+                                                               InputDataSize.image_input_size//2,
+                                                               InputDataSize.image_input_size//2)
                 imgpr.print_image_arr(counter + 1, img, landmark_arr_x, landmark_arr_y)
 
                 '''prepare img'''
                 writable_img = np.reshape(img, [InputDataSize.image_input_size * InputDataSize.image_input_size * 3])
 
                 '''create hm'''
-                heatmap_landmark = self.generate_hm(56, 56, landmark, s=2.0)
-                writable_heatmap = np.reshape(heatmap_landmark, [56 * 56 * self.number_of_landmark//2])
+                heatmap_landmark = self.generate_hm(InputDataSize.hm_size, InputDataSize.hm_size, landmark, s=2.0)
+                writable_heatmap = np.reshape(heatmap_landmark, [InputDataSize.hm_size * InputDataSize.hm_size * self.number_of_landmark//2])
 
                 '''create tf_record:'''
                 if isTest: # no need for hm in test
@@ -2430,7 +2441,7 @@ class TFRecordUtility:
                                                'image_raw': tf.FixedLenFeature([InputDataSize.image_input_size *
                                                                                 InputDataSize.image_input_size * 3]
                                                                                 , tf.float32),
-                                               'heatmap': tf.FixedLenFeature([56 ,56 , self.number_of_landmark // 2],tf.float32),
+                                               'heatmap': tf.FixedLenFeature([InputDataSize.hm_size ,InputDataSize.hm_size , self.number_of_landmark // 2],tf.float32),
                                                'image_name': tf.FixedLenFeature([], tf.string)
                                            })
         landmarks = features['landmarks']
@@ -2465,23 +2476,21 @@ class TFRecordUtility:
         return image_raw, landmarks, pose, image_name
 
     def __read_and_decode_test_set(self, filename_queue):
-        reader = tf.TFRecordReader()
+        reader = tf.compat.v1.TFRecordReader()
         _, serialized_example = reader.read(filename_queue)
 
-        features = tf.parse_single_example(serialized_example,
+        features = tf.compat.v1.parse_single_example(serialized_example,
                                            features={
-                                               'landmarks': tf.FixedLenFeature([self.number_of_landmark],
+                                               'landmarks': tf.compat.v1.FixedLenFeature([self.number_of_landmark],
                                                                                tf.float32),
-                                               'pose': tf.FixedLenFeature([InputDataSize.pose_len], tf.float32),
-                                               'image_raw': tf.FixedLenFeature(
+                                               'image_raw': tf.compat.v1.FixedLenFeature(
                                                    [InputDataSize.image_input_size *
                                                     InputDataSize.image_input_size * 3]
                                                    , tf.float32)
                                            })
         landmarks = features['landmarks']
         image_raw = features['image_raw']
-        pose = features['pose']
-        return image_raw, landmarks, pose
+        return image_raw, landmarks
 
     def test_tf_records_validity(self):
         image_utility = ImageUtility()

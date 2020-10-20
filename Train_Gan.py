@@ -1,6 +1,5 @@
 from configuration import DatasetName, DatasetType, \
     AffectnetConf, IbugConf, W300Conf, InputDataSize, LearningConfig
-from hg_Class import HourglassNet
 from cnn_model import CNNModel
 import tensorflow as tf
 import keras

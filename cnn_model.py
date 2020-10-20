@@ -1,6 +1,5 @@
 from configuration import DatasetName, DatasetType, \
     AffectnetConf, IbugConf, W300Conf, InputDataSize, LearningConfig
-from hg_Class import HourglassNet
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.keras.models import Model
@@ -26,6 +25,7 @@ import scipy.io as sio
 # import coremltools
 
 import efficientnet.tfkeras as efn
+from HG_Network import HGNet
 
 
 # import efficientnet.keras as efn
@@ -42,8 +42,14 @@ class CNNModel:
             model = self.create_effDiscrimNet(input_shape=input_shape, input_tensor=input_tensor)
 
         elif arch == 'hm_reg_model':
-            model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor,
-                                             num_landmark=num_landmark)
+            # import HG_Network as hg
+            # return hg.StackedHourglassNetwork()
+
+            hg_net = HGNet(input_shape=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3], num_landmark=68)
+            return hg_net.create_model()
+
+            # model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor,
+            #                                  num_landmark=num_landmark)
         elif arch == 'cord_reg_model':
             # model = self.mobileNet_v2_main(input_tensor)
             model = self.create_cord_reg_model(input_shape=input_shape, input_tensor=input_tensor,
@@ -256,21 +262,23 @@ class CNNModel:
 
     def create_hm_disc_model(self, num_landmark):
         initializer = tf.random_normal_initializer(0., 0.02)
-        '''converting img{224, 224, 3} to {56, 56, 1}'''
-        imgInput = Input(shape=(224, 224, 3))
-        img_resized = tf.keras.layers.experimental.preprocessing.Resizing(56, 56)(imgInput)
+        '''converting img{InputDataSize.image_input_size, InputDataSize.image_input_size, 3} to {56, 56, 1}'''
+        imgInput = Input(shape=(InputDataSize.image_input_size, InputDataSize.image_input_size, 3))
+        img_resized = tf.keras.layers.experimental.preprocessing.Resizing(InputDataSize.hm_size, InputDataSize.hm_size)(imgInput)
         img_avg = tf.keras.layers.Average()([img_resized[:, :, :, 0], img_resized[:, :, :, 1], img_resized[:, :, :,  2]])
-        img_avg = tf.keras.layers.Reshape((56, 56, 1))(img_avg)
+        img_avg = tf.keras.layers.Reshape((InputDataSize.hm_size, InputDataSize.hm_size, 1))(img_avg)
 
-        '''converting hm{56, 56, 68} to {56, 56, 1}'''
-        hmInput = Input(shape=(56, 56, num_landmark//2))
+        '''converting hm{InputDataSize.hm_size, InputDataSize.hm_size, 68} to {InputDataSize.hm_size, InputDataSize.hm_size, 1}'''
+        hmInput = Input(shape=(InputDataSize.hm_size, InputDataSize.hm_size, num_landmark//2))
         hmInput_avg = tf.keras.layers.Average()([hmInput[:, :, :, i] for i in range(num_landmark//2)])
-        hmInput_avg = tf.keras.layers.Reshape((56, 56, 1))(hmInput_avg)
+        hmInput_avg = tf.keras.layers.Reshape((InputDataSize.hm_size, InputDataSize.hm_size, 1))(hmInput_avg)
 
         '''concat image and hm '''
-        concat_inp = tf.keras.layers.concatenate([hmInput_avg, img_avg])
-        x = self.downsample(64, 4, 1, False)(concat_inp)  # (bs, 56, 56, 64)
-        x = self.downsample(128, 4, 1)(x)  # (bs, 56, 56, 128)
+        concat_inp = tf.keras.layers.Multiply()([hmInput_avg, img_avg])
+
+        # concat_inp = tf.keras.layers.concatenate([hmInput_avg, img_avg])
+        x = self.downsample(64, 4, 1, False)(concat_inp)  # (bs, InputDataSize.hm_size, InputDataSize.hm_size, 64)
+        x = self.downsample(128, 4, 1)(x)  # (bs, InputDataSize.hm_size, InputDataSize.hm_size, 128)
         x = self.downsample(128, 4, 2)(x)  # (bs, 28, 28, 128)
 
         x = self.downsample(256, 4, 1)(x)  # (bs, 28, 28, 256)
@@ -279,11 +287,11 @@ class CNNModel:
 
         x = self.downsample(512, 4, 2)(x)  # (bs, 8, 8, 512)
         x = self.downsample(512, 4, 1)(x)  # (bs, 4, 4, 512)
-        last = tf.keras.layers.Conv2D(1, 4, strides=1,
-                                      kernel_initializer=initializer)(x)  # (bs, 4, 4, 1)
+        x = tf.keras.layers.Conv2D(1, 4, strides=1, kernel_initializer=initializer)(x)  # (bs, 4, 4, 1)
+        # last = Activation('sigmoid')(x)
 
         # x = Flatten()(x)
-        # last = Dense(1, activation='sigmoid', kernel_initializer=initializer, use_bias=False)(x)
+        last = Dense(1, activation='sigmoid', kernel_initializer=initializer, use_bias=False)(x)
 
         model = tf.keras.Model(inputs=[imgInput, hmInput], outputs=last)
         model.summary()
@@ -361,17 +369,8 @@ class CNNModel:
             json_file.write(model_json)
         return eff_net
 
-    def hour_glass_network(self, num_classes=68, num_stacks=10, num_filters=256,
-                           in_shape=(224, 224), out_shape=(56, 56)):
-        hg_net = HourglassNet(num_classes=num_classes, num_stacks=num_stacks,
-                              num_filters=num_filters,
-                              in_shape=in_shape,
-                              out_shape=out_shape)
-        model = hg_net.build_model(mobile=True)
-        return model
-
     def mobileNet_v2_main(self, tensor):
-        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=[224, 224,3],
+        mobilenet_model = mobilenet_v2.MobileNetV2(input_shape=[InputDataSize.image_input_size, InputDataSize.image_input_size,3],
                                                    alpha=1.0,
                                                    include_top=True,
                                                    weights=None,
@@ -405,7 +404,7 @@ class CNNModel:
             net = tf.keras.models.load_model('./final_weights/wflw_ds_.h5', compile=False)
         elif _arch == 'mobileNetV2':
             net = tf.keras.models.load_model('./final_weights/wflw_mn_.h5', compile=False)
-        net._layers[0].batch_input_shape = (1, 224, 224, 3)
+        net._layers[0].batch_input_shape = (1, InputDataSize.image_input_size, InputDataSize.image_input_size, 3)
 
         with tf.Session(graph=tf.Graph()) as sess:
             K.set_session(sess)
@@ -418,15 +417,15 @@ class CNNModel:
             #     revised_model.build(tf.placeholder('float32', shape=(1, 448, 448, 3)))
             #     revised_model.summary()
             #     net = tf.tf.keras.models.load_model('./final_weights/ibug_ds_asm.h5')
-            #     net = self.create_ASMNet(inp_tensor=None, inp_shape=(224, 224, 3), output_len=_output_len)
-            #     net = self.create_ASMNet(inp_tensor=tf.placeholder('float32', shape=(1, 224, 224, 3)), inp_shape=None, output_len=_output_len)
+            #     net = self.create_ASMNet(inp_tensor=None, inp_shape=(InputDataSize.image_input_size, InputDataSize.image_input_size, 3), output_len=_output_len)
+            #     net = self.create_ASMNet(inp_tensor=tf.placeholder('float32', shape=(1, InputDataSize.image_input_size, InputDataSize.image_input_size, 3)), inp_shape=None, output_len=_output_len)
             # elif _arch == 'mobileNetV2':
             #     # net = tf.tf.keras.models.load_model('./final_weights/ibug_mn_.h5')
             #
-            #     # net = self.create_MobileNet(inp_tensor=None, inp_shape=(224, 224, 3), output_len=_output_len)
-            #     # net = resnet50.ResNet50(input_shape=(224, 224, 3),  weights=None)
-            #     # net = resnet50.ResNet50(input_tensor=tf.placeholder('float32', shape=(1, 224, 224, 3)),  weights=None)
-            #     net = mobilenet_v2.MobileNetV2(alpha=1,  weights=None, input_tensor=tf.placeholder('float32', shape=(1, 224, 224, 3)))
+            #     # net = self.create_MobileNet(inp_tensor=None, inp_shape=(InputDataSize.image_input_size, InputDataSize.image_input_size, 3), output_len=_output_len)
+            #     # net = resnet50.ResNet50(input_shape=(InputDataSize.image_input_size, InputDataSize.image_input_size, 3),  weights=None)
+            #     # net = resnet50.ResNet50(input_tensor=tf.placeholder('float32', shape=(1, InputDataSize.image_input_size, InputDataSize.image_input_size, 3)),  weights=None)
+            #     net = mobilenet_v2.MobileNetV2(alpha=1,  weights=None, input_tensor=tf.placeholder('float32', shape=(1, InputDataSize.image_input_size, InputDataSize.image_input_size, 3)))
             #     net.summary()
 
             run_meta = tf.RunMetadata()
