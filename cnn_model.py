@@ -45,7 +45,7 @@ class CNNModel:
             # import HG_Network as hg
             # return hg.StackedHourglassNetwork()
 
-            hg_net = HGNet(input_shape=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3], num_landmark=68)
+            hg_net = HGNet(input_shape=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3], num_landmark=num_landmark)
             return hg_net.create_model()
 
             # model = self.create_hm_reg_model(input_shape=input_shape, input_tensor=input_tensor,
