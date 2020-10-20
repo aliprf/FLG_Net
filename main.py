@@ -67,7 +67,7 @@ if __name__ == '__main__':
     #             weight_fname='weights-94--0.01342.h5', has_pose=True, customLoss=False)
 
     # '''--> Train Model'''
-    fg = FacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model',
+    fg = FacialGAN(dataset_name=DatasetName.cofw, hm_regressor_arch='hm_reg_model',
                    cord_regressor_arch='cord_reg_model',
                    hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
 
@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
                    input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
                    # we concat flatten hm and img
-                   input_shape_cord_disc=IbugConf.num_of_landmarks * 2)  # concat 2 generated and real array
+                   input_shape_cord_disc=CofwConf.num_of_landmarks * 2)  # concat 2 generated and real array
     fg.train()
     # fg.train_network()
 
