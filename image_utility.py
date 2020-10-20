@@ -168,7 +168,7 @@ class ImageUtility:
             if not(min(landmark_arr_x) < 0 or min(landmark_arr_y) < min_b or
                    max(landmark_arr_x) > InputDataSize.image_input_size or max(landmark_arr_y) > max_b):
 
-                self.print_image_arr(str(landmark_arr_x[0]), resized_img, landmark_arr_x, landmark_arr_y)
+                # self.print_image_arr(str(landmark_arr_x[0]), resized_img, landmark_arr_x, landmark_arr_y)
                 #
                 im = Image.fromarray(np.round(resized_img*255).astype(np.uint8))
                 im.save(str(file_name) + '.jpg')

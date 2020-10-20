@@ -213,7 +213,7 @@ class FacialGAN:
     def hm_regressor_loss(self, hm_gr, hm_pr_arr, hm_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
-        w_reg_loss = 10
+        w_reg_loss = 1
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         # mse = tf.keras.losses.MeanSquaredError()
@@ -222,10 +222,10 @@ class FacialGAN:
         # loss_reg = tf.reduce_mean(tf.abs(hm_gr - hm_pr))
         weights = tf.cast(hm_gr > 0, dtype=tf.float32) * 100 + 1
 
-        loss_reg = tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[0]) * 0.3)
-        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[1]) * 0.5)
-        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[2]) * 0.8)
-        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * 2)
+        loss_reg = tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[0]) * weights)
+        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[1]) * weights)
+        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[2]) * weights)
+        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * weights)
         # loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * weights)
         # for hm_pr in hm_pr_arr:
         #     loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr) * weights)
@@ -375,10 +375,10 @@ class FacialGAN:
         cord_reg_model = self.make_cord_generator_model()
         cord_disc_model = self.make_cord_discriminator_model()
 
-        hm_reg_optimizer = self._get_optimizer(lr=2e-4)
-        hm_disc_optimizer = self._get_optimizer(lr=2e-4)
-        cord_reg_optimizer = self._get_optimizer(lr=2e-4)
-        cord_disc_optimizer = self._get_optimizer(lr=2e-4)
+        hm_reg_optimizer = self._get_optimizer(lr=1e-4)
+        hm_disc_optimizer = self._get_optimizer(lr=1e-4)
+        cord_reg_optimizer = self._get_optimizer(lr=1e-4)
+        cord_disc_optimizer = self._get_optimizer(lr=1e-4)
 
         x_train_filenames, x_val_filenames, y_train_filenames, y_val_filenames = self._create_generators()
 
