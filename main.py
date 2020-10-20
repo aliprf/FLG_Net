@@ -30,12 +30,12 @@ if __name__ == '__main__':
 
     '''--> Preparing Train Data process:'''
     '''     augment, normalize, and save pts'''
-    tf_record_util = TFRecordUtility(IbugConf.num_of_landmarks * 2)
-    tf_record_util.rotaate_and_save(dataset_name=DatasetName.ibug)
-    tf_record_util.normalize_points_and_save(dataset_name=DatasetName.ibug)
+    tf_record_util = TFRecordUtility(CofwConf.num_of_landmarks * 2)
+    tf_record_util.rotaate_and_save(dataset_name=DatasetName.cofw)
+    tf_record_util.normalize_points_and_save(dataset_name=DatasetName.cofw)
     # tf_record_util.test_normalize_points(dataset_name=DatasetName.ibug)
     ## tf_record_util.create_face_graph(dataset_name=DatasetName.ibug, dataset_type=None)
-    tf_record_util.create_all_heatmap(dataset_name=DatasetName.ibug, dataset_type=None)
+    tf_record_util.create_all_heatmap(dataset_name=DatasetName.cofw, dataset_type=None)
 
     '''--> retrive and test tfRecords'''
     # tf_record_util = TFRecordUtility(WflwConf.num_of_landmarks*2)
