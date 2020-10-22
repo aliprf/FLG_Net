@@ -577,7 +577,9 @@ class TFRecordUtility:
         """
         x = np.arange(0, width, 1, float)
         y = np.arange(0, height, 1, float)[:, np.newaxis]
-        return np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+        gaus = np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+        gaus[gaus <= 0.01] = 0
+        return gaus
 
     # def retrive_hm_and_test(self):
 
