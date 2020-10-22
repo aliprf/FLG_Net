@@ -250,9 +250,11 @@ class FacialGAN:
         w_reg_loss = 100
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        mse = tf.keras.losses.MeanSquaredError()
+        # mse = tf.keras.losses.MeanSquaredError()
+        mae = tf.keras.losses.MeanAbsoluteError()
 
-        loss_reg = mse(pnt_gr, pnt_pr)
+        loss_reg = mae(pnt_gr, pnt_pr)
+        # loss_reg = mse(pnt_gr, pnt_pr)
         # loss_reg = tf.reduce_mean(tf.abs(pnt_gr - pnt_pr))
         loss_discrimination = cross_entropy(tf.ones_like(pnt_pr), pnt_pr)
 

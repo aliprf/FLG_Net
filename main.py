@@ -8,11 +8,55 @@ import numpy as np
 from train import Train
 from test import Test
 from Facial_GAN import FacialGAN
-# from Hm_Cord_Facial_GAN import HmCordFacialGAN
-
+# from HM_regression_part import HmRegression
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
+    width = height = 64
+    sigma = 3
+    x0 = y0 = 20
+    x = np.arange(0, width, 1, float)
+    y = np.arange(0, height, 1, float)[:, np.newaxis]
+    gaus = np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+    gaus[gaus <= 0.01] = 0
+    ''''''
+    # gaus_bg = np.invert(gaus == 0).astype(int)
+    gaus_bg = (gaus == 0).astype(int)
+    gaus_fg_3 = ((gaus > 0) & (gaus <= 0.5)).astype(int)
+    gaus_fg_2 = ((gaus > 0.5) & (gaus <= 0.8)).astype(int)
+    gaus_fg_1 = (gaus > 0.8).astype(int)
 
+
+    # gaus_bg = np.dot(gaus_bg, gaus)
+
+    # gaus_bg = gaus_fg_3 = gaus_fg_2 = gaus_fg_1 = gaus
+    # gaus_bg = [gaus == 0]
+    # gaus_fg_3 = [gaus <= 0.5]
+    # gaus_fg_2 = [0.5 < gaus <= 0.8]
+    # gaus_fg_1 = [0.8 < gaus <= 1]
+
+    dpi = 80
+    width = 448 * 4
+    height = 448 * 4
+    figsize = width / float(dpi), height / float(dpi)
+    fig, axs = plt.subplots(2, 2, gridspec_kw={'width_ratios': [1, 1]}, figsize=figsize)
+
+    axs[0, 0].title.set_text("bg")
+    axs[0, 0].imshow(gaus_bg)
+    # axs[0, 0].imshow(gaus_bg, vmin=np.amin(gaus_bg), vmax=np.amax(gaus_bg), cmap='gray')
+
+    axs[0, 1].title.set_text("fg 3 : (0.0, 0.5]")
+    axs[0, 1].imshow(gaus_fg_3)
+
+    axs[1, 0].title.set_text("fg 2 : (0.5, 0.8]")
+    axs[1, 0].imshow(gaus_fg_2)
+
+    axs[1, 1].title.set_text("fg 1 : (0.8, 1]")
+    axs[1, 1].imshow(gaus_fg_1)
+
+    plt.tight_layout()
+    plt.savefig("z_guas_hm.png")
+    ''''''
 
     pca_utility = PCAUtility()
     cnn_model = CNNModel()
@@ -67,20 +111,25 @@ if __name__ == '__main__':
     #             weight_fname='weights-94--0.01342.h5', has_pose=True, customLoss=False)
 
     # '''--> Train Model'''
-    fg = FacialGAN(dataset_name=DatasetName.cofw, hm_regressor_arch='hm_reg_model',
-                   cord_regressor_arch='cord_reg_model',
-                   hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
+    # fg = FacialGAN(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model',
+    #                cord_regressor_arch='cord_reg_model',
+    #                hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
+    #
+    #                hm_regressor_weight=None, cord_regressor_weight=None,
+    #                hm_discriminator_weight=None, cord_discriminator_weight=None,
+    #
+    #                input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #                input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #
+    #                input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
+    #                # we concat flatten hm and img
+    #                input_shape_cord_disc=IbugConf.num_of_landmarks * 2)  # concat 2 generated and real array
+    # fg.train()
 
-                   hm_regressor_weight=None, cord_regressor_weight=None,
-                   hm_discriminator_weight=None, cord_discriminator_weight=None,
+    '''Regression Train'''
+    hm_reg = HmRegression(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model', hm_regressor_weight=None,
+                          input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3])
+    hm_reg.train()
 
-                   input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                   input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-
-                   input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
-                   # we concat flatten hm and img
-                   input_shape_cord_disc=CofwConf.num_of_landmarks * 2)  # concat 2 generated and real array
-    fg.train()
-    # fg.train_network()
-
+    '''for test'''
     # test = Test(dataset_name= DatasetName.ibug_test, weight_fname='./training_checkpoints/cord_reg_11_.h5')

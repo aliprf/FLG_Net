@@ -73,6 +73,7 @@ class ImageUtility:
             print(e)
 
     def flip(self, img, _label, num_of_landmarks,):
+        """has not beed developt compeletely. we also need to RE-LABEL points after flipping"""
         t_matrix = np.array([
             [-1, -1, InputDataSize.image_input_size],
             [1, 1, 0],
