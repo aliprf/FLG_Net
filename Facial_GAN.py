@@ -213,7 +213,7 @@ class FacialGAN:
     def hm_regressor_loss(self, hm_gr, hm_pr_arr, hm_pr_conv, epoch):
         """"""
         '''defining hyper parameters'''
-        w_reg_loss = 1
+        w_reg_loss = 10
         '''calculating regression loss and discriminator'''
         cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         # mse = tf.keras.losses.MeanSquaredError()
@@ -222,15 +222,18 @@ class FacialGAN:
         # loss_reg = tf.reduce_mean(tf.abs(hm_gr - hm_pr))
         weights = tf.cast(hm_gr > 0, dtype=tf.float32) * 100 + 1
 
-        loss_reg = tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[0]) * weights)
-        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[1]) * weights)
-        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[2]) * weights)
-        loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * weights)
+        loss_reg = tf.math.reduce_mean(tf.math.abs(hm_gr - hm_pr_arr[0]) * weights*0.5)
+        loss_reg += tf.math.reduce_mean(tf.math.abs(hm_gr - hm_pr_arr[1]) * weights*0.6)
+        loss_reg += tf.math.reduce_mean(tf.math.abs(hm_gr - hm_pr_arr[2]) * weights*0.8)
+        loss_reg += tf.math.reduce_mean(tf.math.abs(hm_gr - hm_pr_arr[3]) * weights)
         # loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr_arr[3]) * weights)
         # for hm_pr in hm_pr_arr:
         #     loss_reg += tf.math.reduce_mean(tf.math.square(hm_gr - hm_pr) * weights)
 
-        loss_discrimination = cross_entropy(tf.ones_like(hm_pr_arr[3]), hm_pr_arr[3])
+        loss_discrimination = cross_entropy(tf.ones_like(hm_pr_arr[0]), hm_pr_arr[0]) * 0.25 + \
+                              cross_entropy(tf.ones_like(hm_pr_arr[1]), hm_pr_arr[1]) * 0.25 + \
+                              cross_entropy(tf.ones_like(hm_pr_arr[2]), hm_pr_arr[2]) * 0.25 + \
+                              cross_entropy(tf.ones_like(hm_pr_arr[3]), hm_pr_arr[3]) * 0.25
 
         '''calculating hm_pr VS points_gr loss'''
         if epoch < 20:
