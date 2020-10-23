@@ -8,7 +8,7 @@ import numpy as np
 from train import Train
 from test import Test
 from Facial_GAN import FacialGAN
-# from HM_regression_part import HmRegression
+from HM_regression_part import HmRegression
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from matplotlib import cm
@@ -126,25 +126,25 @@ if __name__ == '__main__':
     #             weight_fname='weights-94--0.01342.h5', has_pose=True, customLoss=False)
 
     # '''--> Train Model'''
-    fg = FacialGAN(dataset_name=DatasetName.cofw, hm_regressor_arch='hm_reg_model',
-                   cord_regressor_arch='cord_reg_model',
-                   hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
-
-                   hm_regressor_weight=None, cord_regressor_weight=None,
-                   hm_discriminator_weight=None, cord_discriminator_weight=None,
-
-                   input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-                   input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
-
-                   input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
-                   # we concat flatten hm and img
-                   input_shape_cord_disc=CofwConf.num_of_landmarks * 2)  # concat 2 generated and real array
-    fg.train()
+    # fg = FacialGAN(dataset_name=DatasetName.cofw, hm_regressor_arch='hm_reg_model',
+    #                cord_regressor_arch='cord_reg_model',
+    #                hm_discriminator_arch='hm_Disc_model', cord_discriminator_arch='cord_Disc_model',
+    #
+    #                hm_regressor_weight=None, cord_regressor_weight=None,
+    #                hm_discriminator_weight=None, cord_discriminator_weight=None,
+    #
+    #                input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #                input_shape_cord_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3],
+    #
+    #                input_shape_hm_disc=[InputDataSize.hm_size, InputDataSize.hm_size, 2],
+    #                # we concat flatten hm and img
+    #                input_shape_cord_disc=CofwConf.num_of_landmarks * 2)  # concat 2 generated and real array
+    # fg.train()
 
     '''Regression Train'''
-    # hm_reg = HmRegression(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model', hm_regressor_weight=None,
-    #                       input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3])
-    # hm_reg.train()
+    hm_reg = HmRegression(dataset_name=DatasetName.ibug, hm_regressor_arch='hm_reg_model', hm_regressor_weight=None,
+                          input_shape_hm_reg=[InputDataSize.image_input_size, InputDataSize.image_input_size, 3])
+    hm_reg.train()
 
     '''for test'''
     # test = Test(dataset_name= DatasetName.ibug_test, weight_fname='./training_checkpoints/cord_reg_11_.h5')

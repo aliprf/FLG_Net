@@ -857,22 +857,22 @@ class FacialGAN:
 
         tf_utils = TFRecordUtility(number_of_landmark=self.num_landmark)
 
-        if os.path.isfile(x_trains_path) and os.path.isfile(x_validations_path) \
-                and os.path.isfile(y_trains_path) and os.path.isfile(y_validations_path):
-            x_train_filenames = load(x_trains_path)
-            x_val_filenames = load(x_validations_path)
-            y_train = load(y_trains_path)
-            y_val = load(y_validations_path)
-        else:
-            filenames, labels = tf_utils.create_image_and_labels_name(dataset_name=self.dataset_name)
-            filenames_shuffled, y_labels_shuffled = shuffle(filenames, labels)
-            x_train_filenames, x_val_filenames, y_train, y_val = train_test_split(
-                filenames_shuffled, y_labels_shuffled, test_size=0.05, random_state=1)
+        # if os.path.isfile(x_trains_path) and os.path.isfile(x_validations_path) \
+        #         and os.path.isfile(y_trains_path) and os.path.isfile(y_validations_path):
+        #     x_train_filenames = load(x_trains_path)
+        #     x_val_filenames = load(x_validations_path)
+        #     y_train = load(y_trains_path)
+        #     y_val = load(y_validations_path)
+        # else:
+        filenames, labels = tf_utils.create_image_and_labels_name(dataset_name=self.dataset_name)
+        filenames_shuffled, y_labels_shuffled = shuffle(filenames, labels)
+        x_train_filenames, x_val_filenames, y_train, y_val = train_test_split(
+            filenames_shuffled, y_labels_shuffled, test_size=0.05, random_state=1)
 
-            save(x_trains_path, x_train_filenames)
-            save(x_validations_path, x_val_filenames)
-            save(y_trains_path, y_train)
-            save(y_validations_path, y_val)
+        save(x_trains_path, x_train_filenames)
+        save(x_validations_path, x_val_filenames)
+        save(y_trains_path, y_train)
+        save(y_validations_path, y_val)
 
         return x_train_filenames, x_val_filenames, y_train, y_val
 
