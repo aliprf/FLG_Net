@@ -90,7 +90,7 @@ class HmRegression:
 
         return loss_reg
 
-    @tf.function
+    # @tf.function
     def train_step(self, epoch, step, images, heatmaps_gr, hm_reg_model, hm_reg_optimizer, summary_writer):
 
         with tf.GradientTape() as hm_reg_tape:
@@ -100,12 +100,11 @@ class HmRegression:
 
             '''showing the results'''
             if step > 0 and step % 200 == 0:
-                self.print_hm_cord(epoch, step, images, heatmaps_gr, heatmaps_pr)
+                self.print_hm_cord(epoch, step, images, heatmaps_gr)
 
             '''loss calculation'''
             '''     hm loss'''
-            hm_reg_total_loss = self.hm_regressor_loss(hm_gr=heatmaps_gr,
-                                                                                  hm_pr_arr=heatmaps_pr_arr)
+            hm_reg_total_loss = self.hm_regressor_loss(hm_gr=heatmaps_gr, hm_pr_arr=heatmaps_pr_arr)
         ''' Calculate: Gradients'''
         '''     hm: '''
         gradients_of_hm_reg = hm_reg_tape.gradient(hm_reg_total_loss, hm_reg_model.trainable_variables)
@@ -183,3 +182,8 @@ class HmRegression:
         hm_batch = np.array([load(hm_tr_path + file_name) for file_name in batch_y])
 
         return img_batch, hm_batch
+
+    def print_hm_cord(self, epoch, step, images, heatmaps_pr):
+        epoch = 0
+        for i in range(LearningConfig.batch_size):
+            imgpr.print_image_arr_heat('hpr' + '.' + str(epoch)+"."+str(step)+'.'+str(i), heatmaps_pr[i])
